@@ -1,8 +1,13 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 1.4
+  Flujo de Caja La Matriarca — versión 1.5
 
   HISTORIAL DE VERSIONES
+  v1.5 (1 oct 2026) — Ventas como módulo aparte.
+    · Nueva tarjeta "Ventas" en el menú principal, con su propia pantalla:
+      consolidado, por día o por semana, por punto, impoconsumo, propinas,
+      medios de pago y cierres de caja.
+    · Flujo de caja ya no tiene la pestaña de Ventas.
   v1.4 (1 oct 2026) — Ver contraseña.
     · Botón de "ojito" para mostrar u ocultar la contraseña al ingresar
       y al cambiarla.
@@ -38,7 +43,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="1.4">
+<meta name="version" content="1.5">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -55,7 +60,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "1.4";
+window.MX_VERSION = "1.5";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -347,8 +352,11 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
 .g-warn{margin:0;font-size:14px;color:var(--ink);background:var(--bad-bg);border-radius:8px;padding:10px 12px}
 .g-edit{background:var(--sunk);border-radius:10px;padding:12px}
 .g-panel .g-form input:disabled{opacity:.6}
-.m-grid .m-tile:nth-child(2):not(.m-out){grid-column:1/-1;min-height:0;grid-template-columns:auto 1fr;align-items:center;column-gap:14px}
-.m-grid .m-tile:nth-child(2):not(.m-out) .m-ic{grid-row:span 2}
+.m-grid .m-tile:not(.m-out){grid-column:1/-1;min-height:0;grid-template-columns:auto 1fr;align-items:center;column-gap:14px}
+.m-grid .m-tile:not(.m-out) .m-ic{grid-row:span 2}
+.m-grid .m-tile:nth-child(2):not(.m-out){border-color:var(--gold)}
+.m-grid .m-tile:nth-child(2):not(.m-out) .m-ic{width:52px;height:52px;background:linear-gradient(180deg,#D8B56B,#B88E43);color:#1D1608}
+.m-grid .m-tile:nth-child(2):not(.m-out) b{font-size:19px}
 
 .g-pw{position:relative;display:block}
 .g-pw input{width:100%;padding-right:48px !important}
@@ -388,7 +396,12 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
   if (S.D == null) S.D = W.fechaInforme || bounds().max;
 
   var root = document.getElementById('app');
+  var MODE = window.MX_MODE || 'caja';
+  window.MX_SETMODE = function (m) { MODE = m; window.scrollTo(0, 0); render(); };
+  function tabsVisibles() { return MODE === 'ventas' ? [] : (window.MX_NAV ? TABS.filter(function (t) { return t[0] !== 'ventas'; }) : TABS); }
   function render() {
+    if (MODE === 'ventas') S.tab = 'ventas';
+    else if (!tabsVisibles().some(function (t) { return t[0] === S.tab; })) S.tab = 'resumen';
     var b = bounds();
     if (S.D < b.min) S.D = b.min;
     var R = MX.resumen(W, S.D);
@@ -396,14 +409,14 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
     var html = '';
     html += '\x3cheader class="top">\x3cdiv class="bar">\x3cdiv class="wrap top-row">' +
       (window.MX_NAV ? '\x3cbutton class="nav-back" id="nav-back" aria-label="Volver al menú">‹\x3c/button>' : '') +
-      '\x3cdiv class="brand">\x3csmall>La Matriarca · Tesorería' + (window.MX_VERSION ? ' · v' + window.MX_VERSION : '') + '\x3c/small>\x3cb>Flujo de caja\x3c/b>\x3c/div>' +
+      '\x3cdiv class="brand">\x3csmall>La Matriarca · Tesorería' + (window.MX_VERSION ? ' · v' + window.MX_VERSION : '') + '\x3c/small>\x3cb>' + (MODE === 'ventas' ? 'Ventas' : 'Flujo de caja') + '\x3c/b>\x3c/div>' +
       (window.MX_NAV ? '\x3cbutton class="nav-exit" id="nav-exit">Salir\x3c/button>' : '') +
       '\x3cdiv class="datebox" role="group" aria-label="Fecha de corte">\x3cbutton id="d-prev" aria-label="Día anterior">‹\x3c/button>\x3cinput type="date" id="d-in" value="' + iso(S.D) + '" min="' + iso(b.min) + '" max="' + iso(b.max + 30) + '" aria-label="Fecha de corte">\x3cbutton id="d-next" aria-label="Día siguiente">›\x3c/button>\x3c/div>' +
-      (window.MX_ROLE === 'lector' ? '' : '\x3clabel class="btn pri" for="file-in">Cargar Excel\x3cspan class="hide-xs"> del día\x3c/span>\x3c/label>') + '\x3cinput type="file" id="file-in" accept=".xlsx,.xlsm,.xls" hidden>' +
-      '\x3c/div>\x3c/div>\x3cdiv class="tabbar">\x3cnav class="wrap tabs" role="tablist">' + TABS.map(function (t) {
+      (window.MX_ROLE === 'lector' || MODE === 'ventas' ? '' : '\x3clabel class="btn pri" for="file-in">Cargar Excel\x3cspan class="hide-xs"> del día\x3c/span>\x3c/label>') + '\x3cinput type="file" id="file-in" accept=".xlsx,.xlsm,.xls" hidden>' +
+      '\x3c/div>\x3c/div>' + (MODE === 'ventas' ? '' : '\x3cdiv class="tabbar">\x3cnav class="wrap tabs" role="tablist">') + tabsVisibles().map(function (t) {
         var ct = t[0] === 'pagar' ? '\x3cspan class="ct">' + mm(R.pend.tAll) + '\x3c/span>' : t[0] === 'resumen' && A.filter(function (a) { return a.n === 'rojo'; }).length ? '\x3cspan class="ct">' + A.filter(function (a) { return a.n === 'rojo'; }).length + ' alertas\x3c/span>' : '';
         return '\x3cbutton role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + ct + '\x3c/button>';
-      }).join('') + '\x3c/nav>\x3c/div>\x3c/header>';
+      }).join('') + (MODE === 'ventas' ? '' : '\x3c/nav>\x3c/div>') + '\x3c/header>';
     html += '\x3cmain class="wrap fade">';
     if (pending) html += '\x3cdiv class="banner">\x3cspan>Está viendo \x3cb>' + esc(pending.name) + '\x3c/b>, cargado ahora. ' + (artifactNS ? 'Guárdelo para que esta página lo muestre a todos.' : 'Solo usted lo ve en este dispositivo; para guardarlo para todos, ábralo con una cuenta con permiso de edición.') + '\x3c/span>\x3cspan style="display:flex;gap:8px">' + (artifactNS ? '\x3cbutton class="btn pri" id="save">Guardar para todos\x3c/button>' : '') + '\x3cbutton class="btn" id="discard">Volver a los datos guardados\x3c/button>\x3c/span>\x3c/div>';
     if (S.err) html += '\x3cdiv class="banner err">\x3cspan>' + esc(S.err) + '\x3c/span>\x3cbutton class="btn" id="err-x">Cerrar\x3c/button>\x3c/div>';
@@ -880,7 +893,7 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
     });
   }
   function MXnum(v) { var n = parseFloat(String(v).replace(/[^\d\-]/g, '')); return isFinite(n) ? n : null; }
-  function go(t) { S.tab = t; try { localStorage.setItem('mx-tab', t); } catch (e) {} window.scrollTo(0, 0); render(); }
+  function go(t) { S.tab = t; try { if (t !== 'ventas' || !window.MX_NAV) localStorage.setItem('mx-tab', t); } catch (e) {} window.scrollTo(0, 0); render(); }
 
   /* ---------- Cargar Excel ---------- */
   function load(file) {
@@ -1466,14 +1479,16 @@ if (typeof module !== 'undefined') module.exports = MX;
     gate.hidden = true; gate.innerHTML = ''; $('app').hidden = false; window.scrollTo(0, 0);
     new Function(document.getElementById('mx-app').textContent)();
   }
-  function abrirCaja() {
-    if (booted) { gate.hidden = true; gate.innerHTML = ''; $('app').hidden = false; window.scrollTo(0, 0); return; }
+  function abrirCaja(modo) {
+    window.MX_MODE = modo || 'caja';
+    if (booted) { gate.hidden = true; gate.innerHTML = ''; $('app').hidden = false; window.MX_SETMODE(window.MX_MODE); return; }
     cargarDatos();
   }
   function alertaBreve(m) { var d = document.createElement('div'); d.className = 'g-toast'; d.textContent = m; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3500); }
 
   /* ---------- Menú principal y navegación ---------- */
   var ICO = {
+    ventas: '\x3cpath d="M4 19V5M4 19h16"/>\x3cpath d="M8 15l3.5-4 3 2.5L19 8"/>\x3cpath d="M15 8h4v4"/>',
     caja: '\x3cpath d="M3 9.5 12 4l9 5.5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
     users: '\x3ccircle cx="9" cy="8" r="3.2"/>\x3cpath d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/>\x3cpath d="M16 5.2a3 3 0 0 1 0 5.6M18 13.8c1.8.6 3 2.3 3 4.7"/>',
     clave: '\x3crect x="4" y="10" width="16" height="10" rx="2"/>\x3cpath d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2.5"/>',
@@ -1483,7 +1498,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   function quien() { return perfil && perfil.nombre ? perfil.nombre : (auth.currentUser ? auth.currentUser.email : ''); }
   function menu(msg) {
     hideApp(); gate.hidden = false; gate.className = ''; window.scrollTo(0, 0);
-    var items = [['caja', 'Flujo de caja', 'Resumen, ventas, pagos, bancos y proyección']];
+    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['ventas', 'Ventas', 'Ventas por día, por punto, impoconsumo y propinas']];
     if (esAdmin()) items.push(['users', 'Administración de usuarios', 'Crear, editar y eliminar usuarios']);
     items.push(['salir', 'Salir', 'Cerrar sesión y volver al ingreso']);
     gate.innerHTML = '\x3cdiv class="scr">\x3cdiv class="scr-in">\x3cdiv class="m-hi">\x3csmall>Bienvenido\x3c/small>\x3cb>' + esc(quien()) + '\x3c/b>\x3cspan>' + esc(ROLES[window.MX_ROLE] || '') + '\x3c/span>\x3c/div>' +
@@ -1497,7 +1512,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   function bindBarra() { $('g-back').onclick = function () { ir('menu'); }; $('g-exit').onclick = cerrar; }
   function cerrar() { marcar(false); auth.signOut().then(function () { history.replaceState(null, '', location.pathname); location.reload(); }); }
   function pintar(v) {
-    if (v === 'caja') abrirCaja();
+    if (v === 'caja' || v === 'ventas') abrirCaja(v);
     else if (v === 'usuarios' && esAdmin()) modUsuarios();
     else if (v === 'clave') { cambiarClave(false, function (m) { ir('menu', m); }); }
     else menu(arguments[1]);

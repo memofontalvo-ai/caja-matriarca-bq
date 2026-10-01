@@ -1,8 +1,16 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 1.0
+  Flujo de Caja La Matriarca — versión 1.1
 
   HISTORIAL DE VERSIONES
+  v1.1 (1 oct 2026) — Usuarios propios.
+    · Se entra con nombre de usuario y contraseña (ya no hace falta el correo).
+    · Módulo "Usuarios" solo para el administrador: crear, desactivar,
+      cambiar permiso y poner una contraseña nueva.
+    · Permisos: Administrador, Puede cargar Excel, Solo consulta.
+    · La contraseña inicial se debe cambiar en el primer ingreso.
+    · Opción "Cambiar contraseña" para todos.
+    · El administrador también puede entrar con el usuario "guillermo".
   v1.0 (1 oct 2026) — Primera versión publicada en GitHub Pages con Firebase.
     · Inicio de sesión con correo y contraseña.
     · Datos guardados en Firestore (tesoreria/actual) con historial de cada carga.
@@ -15,7 +23,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="1.0">
+<meta name="version" content="1.1">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -32,7 +40,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "1.0";
+window.MX_VERSION = "1.1";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -248,6 +256,28 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
 .g-msg{margin:0;color:var(--muted)}.g-err{margin:0;color:var(--bad);font-weight:600}
 .g-link{border:0;background:none;color:var(--accent);font-weight:600;padding:0;cursor:pointer}
 .g-foot{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:center;padding:0 16px 28px;font-size:13px;color:var(--muted)}
+.g-form select{border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:var(--bg);font-size:16px}
+.g-ok{margin:0;background:var(--good-bg);color:var(--good);border-radius:10px;padding:10px 12px;font-weight:600}
+.g-hint{margin:2px 0 0;font-size:13px;color:var(--muted)}
+#gate.g-full{display:block;place-items:initial;background:var(--bg);padding:0}
+.g-panel{max-width:720px;margin:0 auto;padding:20px 16px 48px;display:grid;gap:16px}
+.g-ph{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:8px}
+.g-ph small{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.g-ph h2{margin:2px 0 0;font-size:24px;font-weight:800}
+.g-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 16px;display:grid;gap:8px}
+.g-box h3{margin:0 0 4px;font-size:15px;letter-spacing:0;text-transform:none;color:var(--ink)}
+.g-u{display:grid;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
+.g-u:first-child{border-top:0}
+.g-u.off .g-ui{opacity:.55}
+.g-ui{display:grid;gap:2px;min-width:0}.g-ui span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.g-ui code{font-size:13px;background:var(--sunk);padding:1px 6px;border-radius:5px;color:var(--ink)}
+.g-ua{display:flex;flex-wrap:wrap;gap:8px}
+.g-ua select{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--surface);font-size:14px}
+.g-sm{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 10px;font-size:14px;font-weight:600;cursor:pointer}
+.g-sm.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.g-rs{display:grid;gap:6px}.g-rs label{font-size:13px;color:var(--muted)}
+.g-row{display:flex;gap:8px}.g-row input{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--bg);font-size:16px}
+.g-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:60}
 </style>
 </head>
 <body>
@@ -290,7 +320,7 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
     html += '\x3cheader class="top">\x3cdiv class="bar">\x3cdiv class="wrap top-row">' +
       '\x3cdiv class="brand">\x3csmall>La Matriarca · Tesorería' + (window.MX_VERSION ? ' · v' + window.MX_VERSION : '') + '\x3c/small>\x3cb>Flujo de caja\x3c/b>\x3c/div>' +
       '\x3cdiv class="datebox" role="group" aria-label="Fecha de corte">\x3cbutton id="d-prev" aria-label="Día anterior">‹\x3c/button>\x3cinput type="date" id="d-in" value="' + iso(S.D) + '" min="' + iso(b.min) + '" max="' + iso(b.max + 30) + '" aria-label="Fecha de corte">\x3cbutton id="d-next" aria-label="Día siguiente">›\x3c/button>\x3c/div>' +
-      '\x3clabel class="btn pri" for="file-in">Cargar Excel del día\x3c/label>\x3cinput type="file" id="file-in" accept=".xlsx,.xlsm,.xls" hidden>' +
+      (window.MX_ROLE === 'lector' ? '' : '\x3clabel class="btn pri" for="file-in">Cargar Excel del día\x3c/label>') + '\x3cinput type="file" id="file-in" accept=".xlsx,.xlsm,.xls" hidden>' +
       '\x3c/div>\x3c/div>\x3cdiv class="tabbar">\x3cnav class="wrap tabs" role="tablist">' + TABS.map(function (t) {
         var ct = t[0] === 'pagar' ? '\x3cspan class="ct">' + mm(R.pend.tAll) + '\x3c/span>' : t[0] === 'resumen' && A.filter(function (a) { return a.n === 'rojo'; }).length ? '\x3cspan class="ct">' + A.filter(function (a) { return a.n === 'rojo'; }).length + ' alertas\x3c/span>' : '';
         return '\x3cbutton role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + ct + '\x3c/button>';
@@ -1119,41 +1149,160 @@ var MX = (function () {
 if (typeof module !== 'undefined') module.exports = MX;
 </script>
 <script>(function () {
+  var ADMIN_EMAIL = 'memofontalvo@gmail.com';
+  var DOMINIO = 'usuarios.caja-matriarca-bq.firebaseapp.com';
+  var ROLES = { admin: 'Administrador', editor: 'Puede cargar Excel', lector: 'Solo consulta' };
   var gate = document.getElementById('gate');
   var cfg = window.FIREBASE_CONFIG || {};
-  function show(html) { gate.hidden = false; gate.innerHTML = '\x3cdiv class="g-card">\x3cdiv class="g-brand">\x3csmall>La Matriarca · Tesorería' + (window.MX_VERSION ? ' · v' + window.MX_VERSION : '') + '\x3c/small>\x3cb>Flujo de caja\x3c/b>\x3c/div>' + html + '\x3c/div>'; }
+  function card(html) { return '\x3cdiv class="g-card">\x3cdiv class="g-brand">\x3csmall>La Matriarca · Tesorería' + (window.MX_VERSION ? ' · v' + window.MX_VERSION : '') + '\x3c/small>\x3cb>Flujo de caja\x3c/b>\x3c/div>' + html + '\x3c/div>'; }
+  function show(html) { gate.hidden = false; gate.className = ''; gate.innerHTML = card(html); window.scrollTo(0, 0); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function $(id) { return document.getElementById(id); }
   if (!cfg.apiKey || /PEGUE|TU_/i.test(cfg.apiKey)) { show('\x3cp class="g-msg">Falta configurar Firebase. Abra este archivo \x3cb>index.html\x3c/b>, busque el bloque “CONFIGURACIÓN DE FIREBASE” al inicio y pegue los datos de su proyecto.\x3c/p>'); return; }
   if (!window.firebase) { show('\x3cp class="g-msg">No se pudo cargar Firebase. Revise la conexión a internet y recargue la página.\x3c/p>'); return; }
   firebase.initializeApp(cfg);
   var auth = firebase.auth(), db = firebase.firestore();
   var REF = db.collection('tesoreria').doc('actual');
+  var perfil = null; // {nombre, usuario, rol, activo, debeCambiar}
 
-  function loginForm(err, email) {
-    show('\x3cform id="g-login" class="g-form">\x3clabel for="g-email">Correo\x3c/label>\x3cinput id="g-email" type="email" autocomplete="username" required value="' + esc(email || '') + '">' +
+  function normUsuario(u) { return String(u || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '.'); }
+  function esAdmin() { return (auth.currentUser && auth.currentUser.email === ADMIN_EMAIL) || (perfil && perfil.activo && perfil.rol === 'admin'); }
+  function errTxt(er) {
+    var c = (er && er.code) || '';
+    if (/wrong-password|invalid-credential|invalid-login|user-not-found|invalid-email/.test(c)) return 'Usuario o contraseña incorrectos.';
+    if (/too-many-requests/.test(c)) return 'Demasiados intentos. Espere unos minutos y vuelva a intentar.';
+    if (/weak-password/.test(c)) return 'La contraseña debe tener al menos 6 caracteres.';
+    if (/permission-denied/.test(c)) return 'No tiene permiso para esta acción.';
+    if (/network/.test(c)) return 'Sin conexión a internet.';
+    return (er && er.message) || 'Ocurrió un error.';
+  }
+
+  /* ---------- Inicio de sesión ---------- */
+  function loginForm(err, usuario) {
+    show('\x3cform id="g-login" class="g-form">\x3clabel for="g-user">Usuario\x3c/label>\x3cinput id="g-user" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required value="' + esc(usuario || '') + '">' +
       '\x3clabel for="g-pass">Contraseña\x3c/label>\x3cinput id="g-pass" type="password" autocomplete="current-password" required>' +
       (err ? '\x3cp class="g-err">' + esc(err) + '\x3c/p>' : '') + '\x3cbutton class="g-btn" type="submit">Entrar\x3c/button>\x3c/form>');
-    document.getElementById('g-login').onsubmit = function (e) {
+    $('g-login').onsubmit = function (e) {
       e.preventDefault();
       var b = e.target.querySelector('button'); b.disabled = true; b.textContent = 'Entrando…';
-      var em = document.getElementById('g-email').value.trim();
-      auth.signInWithEmailAndPassword(em, document.getElementById('g-pass').value)
-        .catch(function (er) { loginForm(/password|credential|user/i.test(er.code || '') ? 'Correo o contraseña incorrectos.' : 'No se pudo entrar: ' + (er.message || er.code), em); });
+      var u = $('g-user').value.trim(), p = $('g-pass').value;
+      var emailP = u.indexOf('@') >= 0 ? Promise.resolve(u) :
+        db.collection('logins').doc(normUsuario(u)).get().then(function (s) { if (!s.exists) throw { code: 'auth/user-not-found' }; return s.data().email; });
+      emailP.then(function (email) { return auth.signInWithEmailAndPassword(email, p); })
+        .catch(function (er) { loginForm(errTxt(er), u); });
     };
   }
 
+  /* ---------- Cambio de contraseña ---------- */
+  function cambiarClave(obligatorio, volver) {
+    show('\x3cform id="g-cc" class="g-form">\x3cp class="g-msg">' + (obligatorio ? 'Bienvenido, \x3cb>' + esc(perfil && perfil.nombre || '') + '\x3c/b>. Por seguridad, cambie la contraseña inicial antes de continuar.' : 'Cambiar mi contraseña') + '\x3c/p>' +
+      '\x3clabel for="g-act">Contraseña actual\x3c/label>\x3cinput id="g-act" type="password" autocomplete="current-password" required>' +
+      '\x3clabel for="g-n1">Contraseña nueva\x3c/label>\x3cinput id="g-n1" type="password" autocomplete="new-password" minlength="6" required>' +
+      '\x3clabel for="g-n2">Repita la contraseña nueva\x3c/label>\x3cinput id="g-n2" type="password" autocomplete="new-password" minlength="6" required>' +
+      '\x3cp class="g-err" id="g-ccerr">\x3c/p>\x3cbutton class="g-btn" type="submit">Guardar contraseña\x3c/button>' +
+      (obligatorio ? salir() : '\x3cbutton class="g-link" type="button" id="g-ccx">Cancelar\x3c/button>') + '\x3c/form>');
+    bindSalir();
+    if ($('g-ccx')) $('g-ccx').onclick = volver;
+    $('g-cc').onsubmit = function (e) {
+      e.preventDefault();
+      var n1 = $('g-n1').value, n2 = $('g-n2').value, er = $('g-ccerr');
+      if (n1.length < 6) { er.textContent = 'La contraseña nueva debe tener al menos 6 caracteres.'; return; }
+      if (n1 !== n2) { er.textContent = 'Las dos contraseñas nuevas no coinciden.'; return; }
+      if (n1 === $('g-act').value) { er.textContent = 'La contraseña nueva debe ser distinta a la actual.'; return; }
+      var b = e.target.querySelector('.g-btn'); b.disabled = true; b.textContent = 'Guardando…';
+      var u = auth.currentUser;
+      u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email, $('g-act').value))
+        .then(function () { return u.updatePassword(n1); })
+        .then(function () { if (perfil && perfil.debeCambiar) { perfil.debeCambiar = false; return db.collection('usuarios').doc(u.uid).update({ debeCambiar: false, ultimoCambio: firebase.firestore.FieldValue.serverTimestamp() }); } })
+        .then(function () { if (obligatorio) cargarDatos(); else volver('Contraseña cambiada.'); })
+        .catch(function (x) { b.disabled = false; b.textContent = 'Guardar contraseña'; er.textContent = /wrong-password|invalid-credential|invalid-login/.test(x.code || '') ? 'La contraseña actual no es correcta.' : errTxt(x); });
+    };
+  }
+
+  /* ---------- Módulo de usuarios (solo administrador) ---------- */
+  function modUsuarios(msg) {
+    gate.hidden = false; gate.className = 'g-full';
+    gate.innerHTML = '\x3cdiv class="g-panel">\x3cdiv class="g-ph">\x3cdiv>\x3csmall>Administración · v' + esc(window.MX_VERSION || '') + '\x3c/small>\x3ch2>Usuarios\x3c/h2>\x3c/div>\x3cbutton class="g-link" id="g-back">‹ Volver a la app\x3c/button>\x3c/div>' +
+      (msg ? '\x3cp class="g-ok">' + esc(msg) + '\x3c/p>' : '') +
+      '\x3cform id="g-new" class="g-form g-box">\x3ch3>Crear usuario\x3c/h3>' +
+      '\x3clabel for="n-nom">Nombre completo\x3c/label>\x3cinput id="n-nom" required placeholder="Ej.: Carlos Pérez">' +
+      '\x3clabel for="n-usr">Usuario (con este entra)\x3c/label>\x3cinput id="n-usr" required autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej.: carlos">' +
+      '\x3clabel for="n-pas">Contraseña inicial\x3c/label>\x3cinput id="n-pas" required minlength="6" autocomplete="off" placeholder="Mínimo 6 caracteres">' +
+      '\x3clabel for="n-rol">Permiso\x3c/label>\x3cselect id="n-rol">\x3coption value="editor">Puede cargar Excel\x3c/option>\x3coption value="lector">Solo consulta\x3c/option>\x3coption value="admin">Administrador\x3c/option>\x3c/select>' +
+      '\x3cp class="g-err" id="n-err">\x3c/p>\x3cbutton class="g-btn" type="submit">Crear usuario\x3c/button>' +
+      '\x3cp class="g-hint">La persona entra con su usuario y esta contraseña, y la app le pide cambiarla la primera vez.\x3c/p>\x3c/form>' +
+      '\x3cdiv class="g-box">\x3ch3>Usuarios creados\x3c/h3>\x3cdiv id="g-list">\x3cp class="g-msg">Cargando…\x3c/p>\x3c/div>\x3c/div>\x3c/div>';
+    $('g-back').onclick = function () { location.reload(); };
+    $('g-new').onsubmit = function (e) {
+      e.preventDefault();
+      var nom = $('n-nom').value.trim(), usr = normUsuario($('n-usr').value), pas = $('n-pas').value, rol = $('n-rol').value, er = $('n-err');
+      if (!/^[a-z0-9._-]{3,30}$/.test(usr)) { er.textContent = 'El usuario debe tener entre 3 y 30 letras o números, sin espacios ni tildes (puede usar punto o guion).'; return; }
+      if (pas.length < 6) { er.textContent = 'La contraseña inicial debe tener al menos 6 caracteres.'; return; }
+      var b = e.target.querySelector('.g-btn'); b.disabled = true; b.textContent = 'Creando…'; er.textContent = '';
+      crearCuenta(nom, usr, pas, rol, null).then(function () { modUsuarios('Usuario “' + usr + '” creado. Contraseña inicial: ' + pas); })
+        .catch(function (x) { b.disabled = false; b.textContent = 'Crear usuario'; er.textContent = x.msg || errTxt(x); });
+    };
+    db.collection('usuarios').get().then(function (snap) {
+      var rows = snap.docs.map(function (d) { var o = Object.assign({}, d.data()); o.uid = d.id; return o; }).filter(function (o) { return !o.reemplazadoPor; }).sort(function (a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+      $('g-list').innerHTML = rows.length ? rows.map(function (u) {
+        var yo = auth.currentUser && u.uid === auth.currentUser.uid;
+        return '\x3cdiv class="g-u' + (u.activo ? '' : ' off') + '">\x3cdiv class="g-ui">\x3cb>' + esc(u.nombre) + (yo ? ' (usted)' : '') + '\x3c/b>\x3cspan>Usuario: \x3ccode>' + esc(u.usuario) + '\x3c/code> · ' + esc(ROLES[u.rol] || u.rol) + (u.activo ? '' : ' · \x3cem>Desactivado\x3c/em>') + (u.debeCambiar && u.activo ? ' · Pendiente cambiar contraseña' : '') + '\x3c/span>\x3c/div>' +
+          (yo ? '' : '\x3cdiv class="g-ua">\x3cselect data-rol="' + u.uid + '">' + Object.keys(ROLES).map(function (k) { return '\x3coption value="' + k + '"' + (k === u.rol ? ' selected' : '') + '>' + ROLES[k] + '\x3c/option>'; }).join('') + '\x3c/select>' +
+            '\x3cbutton class="g-sm" data-act="' + u.uid + '">' + (u.activo ? 'Desactivar' : 'Activar') + '\x3c/button>' +
+            (u.activo ? '\x3cbutton class="g-sm" data-reset="' + u.uid + '">Nueva contraseña\x3c/button>' : '') + '\x3c/div>') +
+          '\x3cdiv class="g-rs" id="rs-' + u.uid + '" hidden>\x3c/div>\x3c/div>';
+      }).join('') : '\x3cp class="g-msg">Todavía no ha creado usuarios.\x3c/p>';
+      rows.forEach(function (u) {
+        var sel = gate.querySelector('[data-rol="' + u.uid + '"]'); if (sel) sel.onchange = function () { db.collection('usuarios').doc(u.uid).update({ rol: sel.value }).then(function () { modUsuarios('Permiso de “' + u.usuario + '” actualizado.'); }).catch(function (x) { modUsuarios(errTxt(x)); }); };
+        var ac = gate.querySelector('[data-act="' + u.uid + '"]'); if (ac) ac.onclick = function () { var era = !!u.activo; db.collection('usuarios').doc(u.uid).update({ activo: !era }).then(function () { modUsuarios('Usuario “' + u.usuario + '” ' + (era ? 'desactivado: ya no puede ver los datos.' : 'activado.')); }).catch(function (x) { modUsuarios(errTxt(x)); }); };
+        var rs = gate.querySelector('[data-reset="' + u.uid + '"]'); if (rs) rs.onclick = function () {
+          var box = $('rs-' + u.uid); box.hidden = false;
+          box.innerHTML = '\x3clabel>Nueva contraseña inicial para ' + esc(u.usuario) + '\x3c/label>\x3cdiv class="g-row">\x3cinput id="rp-' + u.uid + '" minlength="6" autocomplete="off" placeholder="Mínimo 6 caracteres">\x3cbutton class="g-sm pri" id="rb-' + u.uid + '">Guardar\x3c/button>\x3c/div>\x3cp class="g-err" id="re-' + u.uid + '">\x3c/p>';
+          $('rb-' + u.uid).onclick = function () {
+            var np = $('rp-' + u.uid).value; if (np.length < 6) { $('re-' + u.uid).textContent = 'Mínimo 6 caracteres.'; return; }
+            this.disabled = true;
+            crearCuenta(u.nombre, u.usuario, np, u.rol, u).then(function () { modUsuarios('Nueva contraseña de “' + u.usuario + '”: ' + np + '. La deberá cambiar al entrar.'); })
+              .catch(function (x) { $('re-' + u.uid).textContent = x.msg || errTxt(x); });
+          };
+        };
+      });
+    }).catch(function (x) { $('g-list').innerHTML = '\x3cp class="g-err">' + esc(errTxt(x)) + '\x3c/p>'; });
+  }
+  // Crea la cuenta con una segunda conexión para no cerrar la sesión del administrador.
+  // Si "anterior" viene, es un restablecimiento: se crea una cuenta nueva con el mismo usuario y se desactiva la anterior.
+  function crearCuenta(nombre, usuario, clave, rol, anterior) {
+    var loginRef = db.collection('logins').doc(usuario);
+    return loginRef.get().then(function (s) {
+      if (s.exists && !anterior) throw { msg: 'Ya existe un usuario “' + usuario + '”. Escoja otro.' };
+      var n = anterior ? (anterior.version || 1) + 1 : 1;
+      var email = usuario + (n > 1 ? '.' + n : '') + '@' + DOMINIO;
+      var sec = firebase.initializeApp(cfg, 'alta-' + Date.now());
+      return sec.auth().createUserWithEmailAndPassword(email, clave).then(function (cred) {
+        var uid = cred.user.uid;
+        return sec.auth().signOut().then(function () { return sec.delete(); }).then(function () {
+          var batch = db.batch();
+          batch.set(db.collection('usuarios').doc(uid), { nombre: nombre, usuario: usuario, email: email, rol: rol, activo: true, debeCambiar: true, version: n, creado: firebase.firestore.FieldValue.serverTimestamp(), creadoPor: auth.currentUser.email });
+          batch.set(loginRef, { email: email, uid: uid });
+          if (anterior) batch.update(db.collection('usuarios').doc(anterior.uid), { activo: false, reemplazadoPor: uid });
+          return batch.commit();
+        });
+      }, function (x) { sec.delete(); if (/email-already-in-use/.test(x.code || '')) throw { msg: 'Ese usuario ya tuvo una cuenta. Use otro nombre de usuario.' }; throw x; });
+    });
+  }
+
+  /* ---------- Datos ---------- */
   window.MX_SAVE = function (W, archivo) {
+    if (window.MX_ROLE === 'lector') return Promise.reject({ code: 'permission-denied' });
     var json = JSON.stringify(W);
     if (json.length > 900000) return Promise.reject({ message: 'El Excel es demasiado grande para guardarlo en un solo registro (' + Math.round(json.length / 1024) + ' KB).' });
     var u = auth.currentUser, now = new Date();
-    var rec = { json: json, archivo: archivo || '', por: u ? u.email : '', fechaInforme: W.fechaInforme || null, guardado: firebase.firestore.FieldValue.serverTimestamp() };
+    var rec = { json: json, archivo: archivo || '', por: perfil && perfil.usuario ? perfil.usuario : (u ? u.email : ''), fechaInforme: W.fechaInforme || null, guardado: firebase.firestore.FieldValue.serverTimestamp() };
     var id = now.toISOString().slice(0, 16).replace(/[:T]/g, '-');
     var batch = db.batch();
     batch.set(REF, rec);
     batch.set(db.collection('historial').doc(id), rec);
     return batch.commit();
   };
-
   function parseFile(file) {
     return new Promise(function (ok, bad) {
       var fr = new FileReader();
@@ -1170,20 +1319,20 @@ if (typeof module !== 'undefined') module.exports = MX;
       fr.readAsArrayBuffer(file);
     });
   }
-
   function primerExcel(err) {
+    if (window.MX_ROLE === 'lector') { show('\x3cp class="g-msg">Todavía no hay datos cargados. Cuando el administrador cargue el Excel podrá verlos aquí.\x3c/p>' + salir()); bindSalir(); return; }
     show('\x3cp class="g-msg">Todavía no hay datos guardados. Cargue el Excel de Tesorería Integrada para empezar.\x3c/p>' + (err ? '\x3cp class="g-err">' + esc(err) + '\x3c/p>' : '') +
-      '\x3clabel class="g-btn" for="g-file">Cargar Excel\x3c/label>\x3cinput id="g-file" type="file" accept=".xlsx,.xlsm,.xls" hidden>' + salir());
-    bindSalir();
-    document.getElementById('g-file').onchange = function (e) {
+      '\x3clabel class="g-btn" for="g-file">Cargar Excel\x3c/label>\x3cinput id="g-file" type="file" accept=".xlsx,.xlsm,.xls" hidden>' + (esAdmin() ? '\x3cbutton class="g-link" type="button" id="g-adm">Administrar usuarios\x3c/button>' : '') + salir());
+    bindSalir(); if ($('g-adm')) $('g-adm').onclick = function () { modUsuarios(); };
+    $('g-file').onchange = function (e) {
       var f = e.target.files[0]; if (!f) return;
       show('\x3cp class="g-msg">Leyendo y guardando ' + esc(f.name) + '…\x3c/p>');
       parseFile(f).then(function (W) { return window.MX_SAVE(W, f.name).then(function () { boot(W); }); })
-        .catch(function (er) { primerExcel(er.message || 'No se pudo guardar.'); });
+        .catch(function (er) { primerExcel(er.message || errTxt(er)); });
     };
   }
   function salir() { return '\x3cbutton class="g-link" id="g-out" type="button">Cerrar sesión\x3c/button>'; }
-  function bindSalir() { var b = document.getElementById('g-out'); if (b) b.onclick = function () { auth.signOut().then(function () { location.reload(); }); }; }
+  function bindSalir() { var b = $('g-out'); if (b) b.onclick = function () { auth.signOut().then(function () { location.reload(); }); }; }
 
   var booted = false;
   function boot(W) {
@@ -1192,23 +1341,52 @@ if (typeof module !== 'undefined') module.exports = MX;
     window.MX_INITIAL = W;
     gate.hidden = true; gate.innerHTML = '';
     new Function(document.getElementById('mx-app').textContent)();
-    var foot = document.createElement('div'); foot.className = 'g-foot';
-    foot.innerHTML = '\x3cspan>' + esc(auth.currentUser ? auth.currentUser.email : '') + '\x3c/span>' + salir();
+    var foot = document.createElement('div'); foot.className = 'g-foot'; foot.id = 'g-foot';
+    var quien = perfil && perfil.nombre ? perfil.nombre + ' (' + perfil.usuario + ')' : (auth.currentUser ? auth.currentUser.email : '');
+    foot.innerHTML = '\x3cspan>' + esc(quien) + ' · ' + esc(ROLES[window.MX_ROLE] || '') + '\x3c/span>' +
+      (esAdmin() ? '\x3cbutton class="g-link" id="g-adm">Usuarios\x3c/button>' : '') + '\x3cbutton class="g-link" id="g-pw">Cambiar contraseña\x3c/button>' + salir();
     document.body.appendChild(foot); bindSalir();
+    if ($('g-adm')) $('g-adm').onclick = function () { $('app').hidden = true; foot.hidden = true; modUsuarios(); };
+    $('g-pw').onclick = function () { $('app').hidden = true; foot.hidden = true; cambiarClave(false, function (m) { gate.hidden = true; $('app').hidden = false; foot.hidden = false; if (m) alertaBreve(m); }); };
+  }
+  function alertaBreve(m) { var d = document.createElement('div'); d.className = 'g-toast'; d.textContent = m; document.body.appendChild(d); setTimeout(function () { d.remove(); }, 3500); }
+
+  function cargarDatos() {
+    show('\x3cp class="g-msg">Cargando datos…\x3c/p>');
+    REF.get().then(function (snap) {
+      if (snap.exists && snap.data().json) boot(JSON.parse(snap.data().json));
+      else primerExcel();
+    }).catch(function (er) {
+      show('\x3cp class="g-err">' + (er.code === 'permission-denied' ? 'Su usuario no tiene permiso para ver estos datos. Pida al administrador que lo active.' : 'No se pudieron cargar los datos: ' + esc(er.message || er.code)) + '\x3c/p>' + salir());
+      bindSalir();
+    });
   }
 
   show('\x3cp class="g-msg">Cargando…\x3c/p>');
   auth.onAuthStateChanged(function (u) {
     if (!u) { if (booted) location.reload(); else loginForm(); return; }
     if (booted) return;
-    show('\x3cp class="g-msg">Cargando datos…\x3c/p>');
-    REF.get().then(function (snap) {
-      if (snap.exists && snap.data().json) boot(JSON.parse(snap.data().json));
-      else primerExcel();
-    }).catch(function (er) {
-      show('\x3cp class="g-err">' + (er.code === 'permission-denied' ? 'Su usuario (' + esc(u.email) + ') no tiene permiso para ver estos datos. Pida que lo agreguen en las reglas de Firestore.' : 'No se pudieron cargar los datos: ' + esc(er.message || er.code)) + '\x3c/p>' + salir());
-      bindSalir();
-    });
+    show('\x3cp class="g-msg">Cargando…\x3c/p>');
+    db.collection('usuarios').doc(u.uid).get().then(function (s) {
+      perfil = s.exists ? s.data() : null;
+      if (u.email === ADMIN_EMAIL) {
+        window.MX_ROLE = 'admin';
+        if (!perfil) { // primera vez del administrador: le crea el usuario "guillermo"
+          perfil = { nombre: 'Guillermo Fontalvo', usuario: 'guillermo', email: u.email, rol: 'admin', activo: true, debeCambiar: false, version: 1 };
+          return db.collection('logins').doc('guillermo').get().then(function (l) {
+            var b = db.batch();
+            b.set(db.collection('usuarios').doc(u.uid), Object.assign({ creado: firebase.firestore.FieldValue.serverTimestamp() }, perfil));
+            if (!l.exists) b.set(db.collection('logins').doc('guillermo'), { email: u.email, uid: u.uid });
+            return b.commit();
+          }).then(cargarDatos, cargarDatos);
+        }
+        return cargarDatos();
+      }
+      if (!perfil || !perfil.activo) { show('\x3cp class="g-err">Su usuario está desactivado o no tiene acceso. Hable con el administrador.\x3c/p>' + salir()); bindSalir(); return; }
+      window.MX_ROLE = perfil.rol;
+      if (perfil.debeCambiar) return cambiarClave(true);
+      cargarDatos();
+    }).catch(function (er) { show('\x3cp class="g-err">' + esc(errTxt(er)) + '\x3c/p>' + salir()); bindSalir(); });
   });
 })();
 </script>

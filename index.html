@@ -1,8 +1,14 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 1.2
+  Flujo de Caja La Matriarca — versión 1.3
 
   HISTORIAL DE VERSIONES
+  v1.3 (1 oct 2026) — Ingreso obligatorio y administración de usuarios.
+    · Cada vez que se abre la app pide usuario y contraseña.
+    · Menú: Flujo de caja, Administración de usuarios (administrador) y Salir.
+    · Administración de usuarios: crear, editar (nombre, permiso, estado,
+      contraseña) y eliminar usuarios.
+    · "Salir" vuelve a la pantalla de ingreso.
   v1.2 (1 oct 2026) — Formato de aplicación.
     · Pantalla de entrada con la imagen de La Matriarca · Tesorería.
     · Menú principal: Flujo de caja, Usuarios (administrador),
@@ -29,7 +35,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="1.2">
+<meta name="version" content="1.3">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -46,7 +52,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "1.2";
+window.MX_VERSION = "1.3";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -333,6 +339,13 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
 .m-out{grid-column:1/-1;min-height:0;grid-template-columns:auto 1fr;align-items:center;column-gap:12px;padding:12px 14px}
 .m-out .m-ic{grid-row:span 2;width:38px;height:38px}
 .m-out b{font-size:15px}
+.g-del{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.g-sm.g-del:hover{background:var(--bad-bg)}
+.g-warn{margin:0;font-size:14px;color:var(--ink);background:var(--bad-bg);border-radius:8px;padding:10px 12px}
+.g-edit{background:var(--sunk);border-radius:10px;padding:12px}
+.g-panel .g-form input:disabled{opacity:.6}
+.m-grid .m-tile:nth-child(2):not(.m-out){grid-column:1/-1;min-height:0;grid-template-columns:auto 1fr;align-items:center;column-gap:14px}
+.m-grid .m-tile:nth-child(2):not(.m-out) .m-ic{grid-row:span 2}
 </style>
 </head>
 <body>
@@ -1222,6 +1235,8 @@ if (typeof module !== 'undefined') module.exports = MX;
   if (!window.firebase) { show('\x3cp class="g-msg">No se pudo cargar Firebase. Revise la conexión a internet y recargue la página.\x3c/p>'); return; }
   firebase.initializeApp(cfg);
   var auth = firebase.auth(), db = firebase.firestore();
+  var abierta = false; try { abierta = sessionStorage.getItem('mx-ses') === '1'; } catch (e) {}
+  function marcar(v) { try { v ? sessionStorage.setItem('mx-ses', '1') : sessionStorage.removeItem('mx-ses'); } catch (e) {} }
   var REF = db.collection('tesoreria').doc('actual');
   var perfil = null; // {nombre, usuario, rol, activo, debeCambiar}
 
@@ -1248,8 +1263,8 @@ if (typeof module !== 'undefined') module.exports = MX;
       var u = $('g-user').value.trim(), p = $('g-pass').value;
       var emailP = u.indexOf('@') >= 0 ? Promise.resolve(u) :
         db.collection('logins').doc(normUsuario(u)).get().then(function (s) { if (!s.exists) throw { code: 'auth/user-not-found' }; return s.data().email; });
-      emailP.then(function (email) { return auth.signInWithEmailAndPassword(email, p); })
-        .catch(function (er) { loginForm(errTxt(er), u); });
+      emailP.then(function (email) { marcar(true); abierta = true; return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).then(function () { return auth.signInWithEmailAndPassword(email, p); }); })
+        .catch(function (er) { marcar(false); abierta = false; loginForm(errTxt(er), u); });
     };
   }
 
@@ -1282,7 +1297,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   /* ---------- Módulo de usuarios (solo administrador) ---------- */
   function modUsuarios(msg) {
     hideApp(); gate.hidden = false; gate.className = 'g-full'; window.scrollTo(0, 0);
-    gate.innerHTML = barra('Usuarios', 'Administración') + '\x3cdiv class="g-panel">' +
+    gate.innerHTML = barra('Administración de usuarios', 'La Matriarca · Tesorería') + '\x3cdiv class="g-panel">' +
       (msg ? '\x3cp class="g-ok">' + esc(msg) + '\x3c/p>' : '') +
       '\x3cform id="g-new" class="g-form g-box">\x3ch3>Crear usuario\x3c/h3>' +
       '\x3clabel for="n-nom">Nombre completo\x3c/label>\x3cinput id="n-nom" required placeholder="Ej.: Carlos Pérez">' +
@@ -1304,25 +1319,50 @@ if (typeof module !== 'undefined') module.exports = MX;
     };
     db.collection('usuarios').get().then(function (snap) {
       var rows = snap.docs.map(function (d) { var o = Object.assign({}, d.data()); o.uid = d.id; return o; }).filter(function (o) { return !o.reemplazadoPor; }).sort(function (a, b) { return (a.nombre || '').localeCompare(b.nombre || ''); });
+      var opts = function (sel) { return Object.keys(ROLES).map(function (k) { return '\x3coption value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + ROLES[k] + '\x3c/option>'; }).join(''); };
       $('g-list').innerHTML = rows.length ? rows.map(function (u) {
         var yo = auth.currentUser && u.uid === auth.currentUser.uid;
         return '\x3cdiv class="g-u' + (u.activo ? '' : ' off') + '">\x3cdiv class="g-ui">\x3cb>' + esc(u.nombre) + (yo ? ' (usted)' : '') + '\x3c/b>\x3cspan>Usuario: \x3ccode>' + esc(u.usuario) + '\x3c/code> · ' + esc(ROLES[u.rol] || u.rol) + (u.activo ? '' : ' · \x3cem>Desactivado\x3c/em>') + (u.debeCambiar && u.activo ? ' · Pendiente cambiar contraseña' : '') + '\x3c/span>\x3c/div>' +
-          (yo ? '' : '\x3cdiv class="g-ua">\x3cselect data-rol="' + u.uid + '">' + Object.keys(ROLES).map(function (k) { return '\x3coption value="' + k + '"' + (k === u.rol ? ' selected' : '') + '>' + ROLES[k] + '\x3c/option>'; }).join('') + '\x3c/select>' +
-            '\x3cbutton class="g-sm" data-act="' + u.uid + '">' + (u.activo ? 'Desactivar' : 'Activar') + '\x3c/button>' +
-            (u.activo ? '\x3cbutton class="g-sm" data-reset="' + u.uid + '">Nueva contraseña\x3c/button>' : '') + '\x3c/div>') +
+          '\x3cdiv class="g-ua">' + (yo ? '\x3cbutton class="g-sm" data-mia="1">Cambiar mi contraseña\x3c/button>' : '\x3cbutton class="g-sm" data-edit="' + u.uid + '">Editar\x3c/button>\x3cbutton class="g-sm g-del" data-del="' + u.uid + '">Eliminar\x3c/button>') + '\x3c/div>' +
           '\x3cdiv class="g-rs" id="rs-' + u.uid + '" hidden>\x3c/div>\x3c/div>';
       }).join('') : '\x3cp class="g-msg">Todavía no ha creado usuarios.\x3c/p>';
+      var mia = gate.querySelector('[data-mia]'); if (mia) mia.onclick = function () { ir('clave'); };
       rows.forEach(function (u) {
-        var sel = gate.querySelector('[data-rol="' + u.uid + '"]'); if (sel) sel.onchange = function () { db.collection('usuarios').doc(u.uid).update({ rol: sel.value }).then(function () { modUsuarios('Permiso de “' + u.usuario + '” actualizado.'); }).catch(function (x) { modUsuarios(errTxt(x)); }); };
-        var ac = gate.querySelector('[data-act="' + u.uid + '"]'); if (ac) ac.onclick = function () { var era = !!u.activo; db.collection('usuarios').doc(u.uid).update({ activo: !era }).then(function () { modUsuarios('Usuario “' + u.usuario + '” ' + (era ? 'desactivado: ya no puede ver los datos.' : 'activado.')); }).catch(function (x) { modUsuarios(errTxt(x)); }); };
-        var rs = gate.querySelector('[data-reset="' + u.uid + '"]'); if (rs) rs.onclick = function () {
-          var box = $('rs-' + u.uid); box.hidden = false;
-          box.innerHTML = '\x3clabel>Nueva contraseña inicial para ' + esc(u.usuario) + '\x3c/label>\x3cdiv class="g-row">\x3cinput id="rp-' + u.uid + '" minlength="6" autocomplete="off" placeholder="Mínimo 6 caracteres">\x3cbutton class="g-sm pri" id="rb-' + u.uid + '">Guardar\x3c/button>\x3c/div>\x3cp class="g-err" id="re-' + u.uid + '">\x3c/p>';
-          $('rb-' + u.uid).onclick = function () {
-            var np = $('rp-' + u.uid).value; if (np.length < 6) { $('re-' + u.uid).textContent = 'Mínimo 6 caracteres.'; return; }
+        var box = $('rs-' + u.uid);
+        var ed = gate.querySelector('[data-edit="' + u.uid + '"]'); if (ed) ed.onclick = function () {
+          box.hidden = false;
+          box.innerHTML = '\x3cdiv class="g-form g-edit">\x3clabel for="e-nom-' + u.uid + '">Nombre completo\x3c/label>\x3cinput id="e-nom-' + u.uid + '" value="' + esc(u.nombre) + '">' +
+            '\x3clabel>Usuario\x3c/label>\x3cinput value="' + esc(u.usuario) + '" disabled>' +
+            '\x3clabel for="e-rol-' + u.uid + '">Permiso\x3c/label>\x3cselect id="e-rol-' + u.uid + '">' + opts(u.rol) + '\x3c/select>' +
+            '\x3clabel for="e-act-' + u.uid + '">Estado\x3c/label>\x3cselect id="e-act-' + u.uid + '">\x3coption value="1"' + (u.activo ? ' selected' : '') + '>Activo\x3c/option>\x3coption value="0"' + (u.activo ? '' : ' selected') + '>Desactivado (no puede entrar)\x3c/option>\x3c/select>' +
+            '\x3clabel for="e-pas-' + u.uid + '">Nueva contraseña (opcional)\x3c/label>\x3cinput id="e-pas-' + u.uid + '" autocomplete="off" placeholder="Déjela vacía para no cambiarla">' +
+            '\x3cp class="g-err" id="e-err-' + u.uid + '">\x3c/p>\x3cdiv class="g-ua">\x3cbutton class="g-sm pri" id="e-ok-' + u.uid + '">Guardar cambios\x3c/button>\x3cbutton class="g-sm" id="e-no-' + u.uid + '">Cancelar\x3c/button>\x3c/div>\x3c/div>';
+          $('e-no-' + u.uid).onclick = function () { box.hidden = true; box.innerHTML = ''; };
+          $('e-ok-' + u.uid).onclick = function () {
+            var nom = $('e-nom-' + u.uid).value.trim(), rol = $('e-rol-' + u.uid).value, act = $('e-act-' + u.uid).value === '1', np = $('e-pas-' + u.uid).value, er = $('e-err-' + u.uid);
+            if (!nom) { er.textContent = 'Escriba el nombre.'; return; }
+            if (np && np.length < 6) { er.textContent = 'La contraseña nueva debe tener al menos 6 caracteres.'; return; }
+            this.disabled = true; this.textContent = 'Guardando…';
+            db.collection('usuarios').doc(u.uid).update({ nombre: nom, rol: rol, activo: act }).then(function () {
+              if (!np) return;
+              return crearCuenta(nom, u.usuario, np, rol, Object.assign({}, u, { nombre: nom, rol: rol }), act);
+            }).then(function () { modUsuarios('Usuario “' + u.usuario + '” actualizado.' + (np ? ' Contraseña nueva: ' + np + ' (la deberá cambiar al entrar).' : '')); })
+              .catch(function (x) { er.textContent = x.msg || errTxt(x); var b = $('e-ok-' + u.uid); if (b) { b.disabled = false; b.textContent = 'Guardar cambios'; } });
+          };
+        };
+        var del = gate.querySelector('[data-del="' + u.uid + '"]'); if (del) del.onclick = function () {
+          box.hidden = false;
+          box.innerHTML = '\x3cp class="g-warn">¿Eliminar a \x3cb>' + esc(u.nombre) + '\x3c/b> (' + esc(u.usuario) + ')? Ya no podrá entrar a la aplicación.\x3c/p>\x3cdiv class="g-ua">\x3cbutton class="g-sm g-del" id="d-ok-' + u.uid + '">Sí, eliminar\x3c/button>\x3cbutton class="g-sm" id="d-no-' + u.uid + '">Cancelar\x3c/button>\x3c/div>';
+          $('d-no-' + u.uid).onclick = function () { box.hidden = true; box.innerHTML = ''; };
+          $('d-ok-' + u.uid).onclick = function () {
             this.disabled = true;
-            crearCuenta(u.nombre, u.usuario, np, u.rol, u).then(function () { modUsuarios('Nueva contraseña de “' + u.usuario + '”: ' + np + '. La deberá cambiar al entrar.'); })
-              .catch(function (x) { $('re-' + u.uid).textContent = x.msg || errTxt(x); });
+            var lref = db.collection('logins').doc(u.usuario);
+            lref.get().then(function (l) {
+              var bt = db.batch();
+              bt.delete(db.collection('usuarios').doc(u.uid));
+              if (l.exists && l.data().uid === u.uid) bt.delete(lref);
+              return bt.commit();
+            }).then(function () { modUsuarios('Usuario “' + u.usuario + '” eliminado.'); }).catch(function (x) { modUsuarios(errTxt(x)); });
           };
         };
       });
@@ -1330,7 +1370,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   }
   // Crea la cuenta con una segunda conexión para no cerrar la sesión del administrador.
   // Si "anterior" viene, es un restablecimiento: se crea una cuenta nueva con el mismo usuario y se desactiva la anterior.
-  function crearCuenta(nombre, usuario, clave, rol, anterior) {
+  function crearCuenta(nombre, usuario, clave, rol, anterior, activoNuevo) {
     var loginRef = db.collection('logins').doc(usuario);
     return loginRef.get().then(function (s) {
       if (s.exists && !anterior) throw { msg: 'Ya existe un usuario “' + usuario + '”. Escoja otro.' };
@@ -1341,7 +1381,7 @@ if (typeof module !== 'undefined') module.exports = MX;
         var uid = cred.user.uid;
         return sec.auth().signOut().then(function () { return sec.delete(); }).then(function () {
           var batch = db.batch();
-          batch.set(db.collection('usuarios').doc(uid), { nombre: nombre, usuario: usuario, email: email, rol: rol, activo: true, debeCambiar: true, version: n, creado: firebase.firestore.FieldValue.serverTimestamp(), creadoPor: auth.currentUser.email });
+          batch.set(db.collection('usuarios').doc(uid), { nombre: nombre, usuario: usuario, email: email, rol: rol, activo: activoNuevo === false ? false : true, debeCambiar: true, version: n, creado: firebase.firestore.FieldValue.serverTimestamp(), creadoPor: auth.currentUser.email });
           batch.set(loginRef, { email: email, uid: uid });
           if (anterior) batch.update(db.collection('usuarios').doc(anterior.uid), { activo: false, reemplazadoPor: uid });
           return batch.commit();
@@ -1421,18 +1461,18 @@ if (typeof module !== 'undefined') module.exports = MX;
   function menu(msg) {
     hideApp(); gate.hidden = false; gate.className = ''; window.scrollTo(0, 0);
     var items = [['caja', 'Flujo de caja', 'Resumen, ventas, pagos, bancos y proyección']];
-    if (esAdmin()) items.push(['users', 'Usuarios', 'Crear usuarios y contraseñas']);
-    items.push(['clave', 'Cambiar contraseña', 'Su contraseña de acceso']);
-    items.push(['salir', 'Cerrar sesión', 'Salir de la aplicación']);
+    if (esAdmin()) items.push(['users', 'Administración de usuarios', 'Crear, editar y eliminar usuarios']);
+    items.push(['salir', 'Salir', 'Cerrar sesión y volver al ingreso']);
     gate.innerHTML = '\x3cdiv class="scr">\x3cdiv class="scr-in">\x3cdiv class="m-hi">\x3csmall>Bienvenido\x3c/small>\x3cb>' + esc(quien()) + '\x3c/b>\x3cspan>' + esc(ROLES[window.MX_ROLE] || '') + '\x3c/span>\x3c/div>' +
       (msg ? '\x3cp class="g-ok">' + esc(msg) + '\x3c/p>' : '') +
       '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
+      (esAdmin() ? '' : '\x3cbutton class="g-link" type="button" data-ir="clave">Cambiar mi contraseña\x3c/button>') +
       '\x3cp class="g-ver">Versión ' + esc(window.MX_VERSION || '') + '\x3c/p>\x3c/div>\x3c/div>';
     gate.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { b.dataset.ir === 'salir' ? cerrar() : ir(b.dataset.ir); }; });
   }
   function barra(titulo, sub) { return '\x3cheader class="g-bar">\x3cbutton class="g-back" id="g-back" aria-label="Volver al menú">‹ Menú\x3c/button>\x3cdiv class="g-bt">\x3csmall>' + esc(sub || 'La Matriarca · Tesorería') + '\x3c/small>\x3cb>' + esc(titulo) + '\x3c/b>\x3c/div>\x3cbutton class="g-exit" id="g-exit">Salir\x3c/button>\x3c/header>'; }
   function bindBarra() { $('g-back').onclick = function () { ir('menu'); }; $('g-exit').onclick = cerrar; }
-  function cerrar() { auth.signOut().then(function () { history.replaceState(null, '', location.pathname); location.reload(); }); }
+  function cerrar() { marcar(false); auth.signOut().then(function () { history.replaceState(null, '', location.pathname); location.reload(); }); }
   function pintar(v) {
     if (v === 'caja') abrirCaja();
     else if (v === 'usuarios' && esAdmin()) modUsuarios();
@@ -1462,6 +1502,7 @@ if (typeof module !== 'undefined') module.exports = MX;
 
   show('\x3cp class="g-msg">Cargando…\x3c/p>');
   auth.onAuthStateChanged(function (u) {
+    if (u && !abierta) { auth.signOut(); return; } // cada vez que se abre la app pide usuario y contraseña
     if (!u) { if (booted) location.reload(); else loginForm(); return; }
     if (booted) return;
     show('\x3cp class="g-msg">Cargando…\x3c/p>');

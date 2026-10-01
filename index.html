@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 1.3
+  Flujo de Caja La Matriarca — versión 1.4
 
   HISTORIAL DE VERSIONES
+  v1.4 (1 oct 2026) — Ver contraseña.
+    · Botón de "ojito" para mostrar u ocultar la contraseña al ingresar
+      y al cambiarla.
   v1.3 (1 oct 2026) — Ingreso obligatorio y administración de usuarios.
     · Cada vez que se abre la app pide usuario y contraseña.
     · Menú: Flujo de caja, Administración de usuarios (administrador) y Salir.
@@ -35,7 +38,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="1.3">
+<meta name="version" content="1.4">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -52,7 +55,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "1.3";
+window.MX_VERSION = "1.4";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -346,6 +349,12 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
 .g-panel .g-form input:disabled{opacity:.6}
 .m-grid .m-tile:nth-child(2):not(.m-out){grid-column:1/-1;min-height:0;grid-template-columns:auto 1fr;align-items:center;column-gap:14px}
 .m-grid .m-tile:nth-child(2):not(.m-out) .m-ic{grid-row:span 2}
+
+.g-pw{position:relative;display:block}
+.g-pw input{width:100%;padding-right:48px !important}
+.g-eye{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;background:transparent;color:#5B6760;border-radius:10px;display:grid;place-items:center;cursor:pointer}
+.g-eye:hover{color:#14231B;background:rgba(0,0,0,.05)}
+.g-panel .g-eye{color:var(--muted)}
 </style>
 </head>
 <body>
@@ -1228,6 +1237,20 @@ if (typeof module !== 'undefined') module.exports = MX;
   var cfg = window.FIREBASE_CONFIG || {};
   function card(html) { return '\x3cdiv class="scr">\x3cdiv class="scr-in">\x3cdiv class="g-card">' + html + '\x3c/div>\x3cp class="g-ver">Versión ' + esc(window.MX_VERSION || '') + '\x3c/p>\x3c/div>\x3c/div>'; }
   function show(html) { hideApp(); gate.hidden = false; gate.className = ''; gate.innerHTML = card(html); window.scrollTo(0, 0); }
+  // Botón "ojito" para ver u ocultar cualquier contraseña
+  var OJO = '\x3csvg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">\x3cpath d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/>\x3ccircle cx="12" cy="12" r="3"/>\x3c/svg>';
+  var OJO_NO = '\x3csvg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">\x3cpath d="M3 3l18 18M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6A17.4 17.4 0 0 0 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6M9.9 9.9a3 3 0 0 0 4.2 4.2"/>\x3c/svg>';
+  function ojitos(root) {
+    (root || document).querySelectorAll('input[type="password"]:not([data-ojo])').forEach(function (inp) {
+      inp.setAttribute('data-ojo', '1');
+      var w = document.createElement('div'); w.className = 'g-pw';
+      inp.parentNode.insertBefore(w, inp); w.appendChild(inp);
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'g-eye'; b.innerHTML = OJO; b.setAttribute('aria-label', 'Mostrar contraseña');
+      b.onclick = function () { var ver = inp.type === 'password'; inp.type = ver ? 'text' : 'password'; b.innerHTML = ver ? OJO_NO : OJO; b.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña'); inp.focus(); };
+      w.appendChild(b);
+    });
+  }
+  new MutationObserver(function () { ojitos(gate); }).observe(gate, { childList: true, subtree: true });
   function hideApp() { var a = $('app'); if (a) a.hidden = true; }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function $(id) { return document.getElementById(id); }

@@ -1,8 +1,14 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 1.7
+  Flujo de Caja La Matriarca — versión 1.8
 
   HISTORIAL DE VERSIONES
+  v1.8 (2 oct 2026) — Totales de cuentas por pagar más claros.
+    · "Total por concepto" (proveedores, servicios, personal, gastos varios)
+      con su total, que es igual a vencido + sin fecha.
+    · Tarjeta de gastos varios (y personal cuando tenga saldo), para que
+      la suma por tipo cuadre con el total.
+    · Se quitó la tabla ancha que en el celular dejaba el total por fuera.
   v1.7 (2 oct 2026) — Cuentas por pagar como módulo aparte.
     · Nueva tarjeta "Cuentas por pagar" en el menú principal.
     · Vista "Pendientes": lo que se debe hoy, insumos por tipo de producto
@@ -58,7 +64,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="1.7">
+<meta name="version" content="1.8">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -75,7 +81,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "1.7";
+window.MX_VERSION = "1.8";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -320,6 +326,11 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
 .fx-c span{display:grid}.fx-c span:nth-child(2){text-align:center}.fx-c span:last-child{text-align:right}
 .fx-c small{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:700}
 @media (min-width:760px){.fx{grid-template-columns:minmax(0,1.3fr) minmax(0,1.6fr) auto;align-items:center}.fx-c{grid-column:2;grid-row:1}.fx-b{grid-column:3}}
+
+.sumline{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:4px 12px;background:var(--sunk);border-radius:10px;padding:10px 14px;font-size:13.5px;color:var(--muted)}
+.sumline b{font-size:17px;color:var(--ink);white-space:nowrap;margin-left:auto}
+.row-2 small{display:block;font-size:12.5px;font-weight:400;color:var(--muted);margin-top:1px}
+.row-2>span:first-child{color:var(--ink);font-weight:600}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -709,15 +720,17 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
     h += '\x3cdiv class="grid4">' +
       stTile('venc', 'Vencido', tot.venc, 'Programado antes del ' + F(D)) + stTile('hoy', 'Programado para hoy', tot.hoy, F(D, true)) +
       stTile('fut', 'Programado más adelante', tot.fut, 'Después del ' + F(D)) + stTile('sin', 'Sin fecha de programación', tot.sin, 'No entra en el disponible real') + '\x3c/div>';
-    h += '\x3cdiv class="tbl-wrap">\x3ctable>\x3cthead>\x3ctr>\x3cth>Concepto\x3c/th>\x3cth class="r">Vencido\x3c/th>\x3cth class="r">Hoy\x3c/th>\x3cth class="r">Más adelante\x3c/th>\x3cth class="r">Sin fecha\x3c/th>\x3cth class="r">Total\x3c/th>\x3c/tr>\x3c/thead>\x3ctbody>';
-    var gt = { venc: 0, hoy: 0, fut: 0, sin: 0 };
+    var totalDebe = tot.venc + tot.hoy + tot.fut + tot.sin;
+    h += '\x3cdiv class="sumline">\x3cspan>Vencido' + (tot.hoy ? ' + hoy' : '') + (tot.fut ? ' + más adelante' : '') + ' + sin fecha\x3c/span>\x3cb>= ' + M(totalDebe) + '\x3c/b>\x3c/div>';
+    var porC = '';
     Object.keys(CATN).forEach(function (k) {
       var t = { venc: 0, hoy: 0, fut: 0, sin: 0 };
       rows.forEach(function (p) { if (p.cat === k) t[estado(p, D)] += p.saldo; });
-      Object.keys(t).forEach(function (x) { gt[x] += t[x]; });
-      h += '\x3ctr>\x3ctd>' + CATN[k] + '\x3c/td>\x3ctd class="r">' + M(t.venc) + '\x3c/td>\x3ctd class="r">' + M(t.hoy) + '\x3c/td>\x3ctd class="r">' + M(t.fut) + '\x3c/td>\x3ctd class="r">' + M(t.sin) + '\x3c/td>\x3ctd class="r">\x3cb>' + M(t.venc + t.hoy + t.fut + t.sin) + '\x3c/b>\x3c/td>\x3c/tr>';
+      var tt = t.venc + t.hoy + t.fut + t.sin, partes = [];
+      if (t.venc) partes.push('Vencido ' + M(t.venc)); if (t.hoy) partes.push('Hoy ' + M(t.hoy)); if (t.fut) partes.push('Más adelante ' + M(t.fut)); if (t.sin) partes.push('Sin fecha ' + M(t.sin));
+      porC += '\x3cbutton class="row row-btn row-2" data-tipo="' + k + '|">\x3cspan>' + CATN[k] + ' ›\x3csmall>' + (partes.join(' · ') || 'Nada pendiente') + '\x3c/small>\x3c/span>' + amt(tt) + '\x3c/button>';
     });
-    h += '\x3c/tbody>\x3ctfoot>\x3ctr>\x3ctd>Total\x3c/td>\x3ctd class="r">' + M(gt.venc) + '\x3c/td>\x3ctd class="r">' + M(gt.hoy) + '\x3c/td>\x3ctd class="r">' + M(gt.fut) + '\x3c/td>\x3ctd class="r">' + M(gt.sin) + '\x3c/td>\x3ctd class="r">' + M(gt.venc + gt.hoy + gt.fut + gt.sin) + '\x3c/td>\x3c/tr>\x3c/tfoot>\x3c/table>\x3c/div>\x3c/section>';
+    h += card({ icon: 'sum', title: 'Total por concepto', sub: 'Suma lo mismo que vencido + sin fecha', cls: 'big', body: porC, totalLbl: 'Total que se debe', total: totalDebe, tone: 'bad' }) + '\x3c/section>';
     h += tiposCards();
     // filtros
     h += '\x3csection class="sec" id="detalle">\x3cdiv class="sec-head">\x3ch2>Detalle por tercero\x3c/h2>\x3c/div>\x3cdiv class="filters">' +
@@ -757,10 +770,14 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
   function tiposCards() {
     function porTipo(cat) { var t = {}; W.pay.forEach(function (p) { if (p.cat === cat && p.saldo) { var k = p.sub || 'Sin clasificar'; t[k] = (t[k] || 0) + p.saldo; } }); return Object.keys(t).map(function (k) { return [k, t[k]]; }).sort(function (a, b) { return b[1] - a[1]; }); }
     function body(cat, rows) { return rows.length ? rows.map(function (r) { return '\x3cbutton class="row row-btn" data-tipo="' + cat + '|' + esc(r[0]) + '">\x3cspan>' + esc(r[0]) + ' ›\x3c/span>' + amt(r[1]) + '\x3c/button>'; }).join('') : '\x3cdiv class="empty">Nada pendiente.\x3c/div>'; }
-    var a = porTipo('prov'), b = porTipo('serv');
+    var a = porTipo('prov'), b = porTipo('serv'), c = porTipo('gast'), d = porTipo('pers');
+    var sumT = function (r) { return r.reduce(function (s, x) { return s + x[1]; }, 0); };
+    var extra = (c.length ? card({ icon: 'deuda', title: 'Gastos varios por categoría', sub: 'Mantenimiento, transporte, otros', body: body('gast', c), totalLbl: 'Total gastos varios', total: sumT(c) }) : '') +
+      (d.length ? card({ icon: 'deuda', title: 'Personal por tipo', sub: 'Nómina, turnos, prestadores', body: body('pers', d), totalLbl: 'Total personal', total: sumT(d) }) : '');
     return '\x3csection class="cards2">' +
       card({ icon: 'pagos', title: 'Insumos por tipo de producto', sub: 'Proveedores · toque un tipo para ver sus facturas', body: body('prov', a), totalLbl: 'Total proveedores', total: a.reduce(function (s, r) { return s + r[1]; }, 0) }) +
-      card({ icon: 'imp', title: 'Servicios por tipo', sub: 'Arriendo, administración, servicios públicos', body: body('serv', b), totalLbl: 'Total servicios', total: b.reduce(function (s, r) { return s + r[1]; }, 0) }) + '\x3c/section>';
+      card({ icon: 'imp', title: 'Servicios por tipo', sub: 'Arriendo, administración, servicios públicos', body: body('serv', b), totalLbl: 'Total servicios', total: sumT(b) }) + '\x3c/section>' + (extra ? '\x3csection class="cards2">' + extra + '\x3c/section>' : '') +
+      '\x3cdiv class="sumline">\x3cspan>Proveedores ' + M(sumT(a)) + ' + servicios ' + M(sumT(b)) + (c.length ? ' + gastos varios ' + M(sumT(c)) : '') + (d.length ? ' + personal ' + M(sumT(d)) : '') + '\x3c/span>\x3cb>= ' + M(sumT(a) + sumT(b) + sumT(c) + sumT(d)) + '\x3c/b>\x3c/div>';
   }
   function vPagarSem() {
     var D = S.D, todas = MX.facturas(W).filter(function (x) { return x.semana != null && (S.pCat === 'all' || x.cat === S.pCat); });
@@ -984,7 +1001,7 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
     root.querySelectorAll('[data-seg]').forEach(function (b) { b.onclick = function () { S[b.dataset.seg] = b.dataset.v; render(); }; });
     root.querySelectorAll('[data-est]').forEach(function (b) { b.onclick = function () { S.est = S.est === b.dataset.est ? 'pend' : b.dataset.est; render(); }; });
     root.querySelectorAll('details.party').forEach(function (d) { d.ontoggle = function () { S.open[d.dataset.k] = d.open; }; });
-    root.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { var p = b.dataset.tipo.split('|'); S.cat = p[0]; S.est = 'pend'; S.q = p[1] === 'Sin clasificar' ? '' : p[1]; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
+    root.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { var p = b.dataset.tipo.split('|'); S.cat = p[0]; S.est = 'pend'; S.q = !p[1] || p[1] === 'Sin clasificar' ? '' : p[1]; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
     root.querySelectorAll('[data-sem]').forEach(function (b) { b.onclick = function () { S.pSem = +b.dataset.sem; window.scrollTo(0, 0); render(); }; });
     var wp = document.getElementById('w-prev'); if (wp) wp.onclick = function () { S.pSem = semVecina(1); render(); };
     var wn = document.getElementById('w-next'); if (wn) wn.onclick = function () { S.pSem = semVecina(-1); render(); };

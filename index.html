@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 1.9
+  Flujo de Caja La Matriarca — versión 2.0
 
   HISTORIAL DE VERSIONES
+  v2.0 (3 oct 2026) — Restablecer contraseña.
+    · Botón "Restablecer contraseña" en cada usuario de Administración
+      de usuarios, con una contraseña sugerida que se puede cambiar.
   v1.9 (2 oct 2026) — Ingresos y egresos completos.
     · Nuevo módulo "Egresos y gastos": todo lo causado (pagado y sin pagar)
       por concepto y por tipo, con selector de mes y de periodo
@@ -71,7 +74,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="1.9">
+<meta name="version" content="2.0">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -88,7 +91,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "1.9";
+window.MX_VERSION = "2.0";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1673,7 +1676,7 @@ if (typeof module !== 'undefined') module.exports = MX;
       $('g-list').innerHTML = rows.length ? rows.map(function (u) {
         var yo = auth.currentUser && u.uid === auth.currentUser.uid;
         return '\x3cdiv class="g-u' + (u.activo ? '' : ' off') + '">\x3cdiv class="g-ui">\x3cb>' + esc(u.nombre) + (yo ? ' (usted)' : '') + '\x3c/b>\x3cspan>Usuario: \x3ccode>' + esc(u.usuario) + '\x3c/code> · ' + esc(ROLES[u.rol] || u.rol) + (u.activo ? '' : ' · \x3cem>Desactivado\x3c/em>') + (u.debeCambiar && u.activo ? ' · Pendiente cambiar contraseña' : '') + '\x3c/span>\x3c/div>' +
-          '\x3cdiv class="g-ua">' + (yo ? '\x3cbutton class="g-sm" data-mia="1">Cambiar mi contraseña\x3c/button>' : '\x3cbutton class="g-sm" data-edit="' + u.uid + '">Editar\x3c/button>\x3cbutton class="g-sm g-del" data-del="' + u.uid + '">Eliminar\x3c/button>') + '\x3c/div>' +
+          '\x3cdiv class="g-ua">' + (yo ? '\x3cbutton class="g-sm" data-mia="1">Cambiar mi contraseña\x3c/button>' : '\x3cbutton class="g-sm" data-edit="' + u.uid + '">Editar\x3c/button>\x3cbutton class="g-sm" data-rst="' + u.uid + '">Restablecer contraseña\x3c/button>\x3cbutton class="g-sm g-del" data-del="' + u.uid + '">Eliminar\x3c/button>') + '\x3c/div>' +
           '\x3cdiv class="g-rs" id="rs-' + u.uid + '" hidden>\x3c/div>\x3c/div>';
       }).join('') : '\x3cp class="g-msg">Todavía no ha creado usuarios.\x3c/p>';
       var mia = gate.querySelector('[data-mia]'); if (mia) mia.onclick = function () { ir('clave'); };
@@ -1698,6 +1701,22 @@ if (typeof module !== 'undefined') module.exports = MX;
               return crearCuenta(nom, u.usuario, np, rol, Object.assign({}, u, { nombre: nom, rol: rol }), act);
             }).then(function () { modUsuarios('Usuario “' + u.usuario + '” actualizado.' + (np ? ' Contraseña nueva: ' + np + ' (la deberá cambiar al entrar).' : '')); })
               .catch(function (x) { er.textContent = x.msg || errTxt(x); var b = $('e-ok-' + u.uid); if (b) { b.disabled = false; b.textContent = 'Guardar cambios'; } });
+          };
+        };
+        var rst = gate.querySelector('[data-rst="' + u.uid + '"]'); if (rst) rst.onclick = function () {
+          var sug = 'Matriarca' + String(Math.floor(1000 + Math.random() * 9000));
+          box.hidden = false;
+          box.innerHTML = '\x3cdiv class="g-form g-edit">\x3clabel for="r-pas-' + u.uid + '">Nueva contraseña para ' + esc(u.nombre) + '\x3c/label>\x3cinput id="r-pas-' + u.uid + '" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="' + sug + '">' +
+            '\x3cp class="g-hint">Puede dejar esta o escribir otra (mínimo 6 caracteres). La contraseña anterior deja de servir y la persona deberá cambiarla al entrar.\x3c/p>' +
+            '\x3cp class="g-err" id="r-err-' + u.uid + '">\x3c/p>\x3cdiv class="g-ua">\x3cbutton class="g-sm pri" id="r-ok-' + u.uid + '">Restablecer\x3c/button>\x3cbutton class="g-sm" id="r-no-' + u.uid + '">Cancelar\x3c/button>\x3c/div>\x3c/div>';
+          $('r-no-' + u.uid).onclick = function () { box.hidden = true; box.innerHTML = ''; };
+          $('r-ok-' + u.uid).onclick = function () {
+            var np = $('r-pas-' + u.uid).value.trim(), er = $('r-err-' + u.uid), bt = this;
+            if (np.length < 6) { er.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+            bt.disabled = true; bt.textContent = 'Guardando…';
+            crearCuenta(u.nombre, u.usuario, np, u.rol, u, u.activo)
+              .then(function () { modUsuarios('Contraseña de “' + u.usuario + '” restablecida. Nueva contraseña: ' + np + '. Deberá cambiarla al entrar.'); })
+              .catch(function (x) { er.textContent = x.msg || errTxt(x); bt.disabled = false; bt.textContent = 'Restablecer'; });
           };
         };
         var del = gate.querySelector('[data-del="' + u.uid + '"]'); if (del) del.onclick = function () {

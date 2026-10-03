@@ -1,8 +1,14 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 1.5
+  Flujo de Caja La Matriarca — versión 1.6
 
   HISTORIAL DE VERSIONES
+  v1.6 (2 oct 2026) — Compatible con el Excel "Round 16".
+    · La hoja DISPONIBLE REAL se lee por el nombre de cada renglón
+      (antes por celda fija), porque el contador reorganizó la hoja:
+      MEGAMAS dentro del Total Disponible y las cuentas por cobrar al final.
+    · Sirve tanto para el Excel anterior (Round 15) como para el nuevo.
+    · Nueva alerta si el disponible real de la app no coincide con el del Excel.
   v1.5 (1 oct 2026) — Ventas como módulo aparte.
     · Nueva tarjeta "Ventas" en el menú principal, con su propia pantalla:
       consolidado, por día o por semana, por punto, impoconsumo, propinas,
@@ -43,7 +49,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="1.5">
+<meta name="version" content="1.6">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -60,7 +66,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "1.5";
+window.MX_VERSION = "1.6";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -487,7 +493,7 @@ h2{font-family:var(--f-body);font-weight:800;font-size:19px;letter-spacing:-.01e
     col2 += card({ icon: 'res', title: 'Disponible real', sub: 'Saldo total real − pagos − impuestos', cls: 'big',
       body: row('Saldo total real del día', R.inmediato) + row('Pagos programados', -R.pend.tProg) + row('Impuestos', -R.imp),
       totalLbl: 'Disponible real', total: R.disp, tone: R.disp < 0 ? 'bad' : 'good',
-      extra: '\x3cdiv class="card-x">' + row('Si se cobran las cuentas por cobrar', R.dispConCxc) + '\x3cp class="note">Esta cifra es la que el Excel llama “Disponible real”.\x3c/p>\x3c/div>' });
+      extra: '\x3cdiv class="card-x">' + row('Si se cobran las cuentas por cobrar', R.dispConCxc) + '\x3cp class="note">' + (W.excel && W.excel.megaEnDisponible ? (S.D === W.fechaInforme ? (Math.abs(R.disp - W.excel.disponible) < 2 ? 'El disponible real coincide con el del Excel (' + M(W.excel.disponible) + ').' : 'Ojo: el Excel muestra ' + M(W.excel.disponible) + ' como disponible real.') : 'El Excel calcula el disponible real con esta misma fórmula.') : 'Esta cifra es la que el Excel llama “Disponible real”.') + '\x3c/p>\x3c/div>' });
     h += '\x3csection class="cards2">\x3cdiv class="col">' + col1 + '\x3c/div>\x3cdiv class="col">' + col2 + '\x3c/div>\x3c/section>';
     // Segunda fila
     var d = MX.dia(W, D), m0 = d.m0;
@@ -1005,8 +1011,18 @@ var MX = (function () {
     W.mega = [];
     rows('CUENTAS_POR_COBRAR', 5, 3000, function (g) { var f = dte(g('A')); var v = num(g('H')); if (!f || !v) return; W.mega.push({ f: f, ent: str(g('B')), tipo: str(g('C')), benef: str(g('D')), factura: str(g('E')), concepto: str(g('F')), banco: str(g('G')), v: v }); });
     // Manuales
-    W.fechaInforme = dte(get('DISPONIBLE REAL', 'C5'));
-    W.impuestos = { ICO: num(get('DISPONIBLE REAL', 'E19')), 'Retención': num(get('DISPONIBLE REAL', 'E20')), ICA: num(get('DISPONIBLE REAL', 'E21')), IVA: num(get('DISPONIBLE REAL', 'E22')) };
+    // DISPONIBLE REAL: se lee por el nombre de cada renglón (columna B), no por celda fija,
+    // para que siga funcionando si el contador agrega o mueve filas.
+    var DR = [];
+    for (var dr = 1; dr <= 60; dr++) { var lb = str(get('DISPONIBLE REAL', 'B' + dr)); if (lb) DR.push({ r: dr, lbl: lb, key: lb.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''), v: num(get('DISPONIBLE REAL', 'E' + dr)) }); }
+    function drFind(re) { for (var i = 0; i < DR.length; i++) if (re.test(DR[i].key)) return DR[i]; return null; }
+    function drVal(re) { var x = drFind(re); return x ? x.v : 0; }
+    var fRow = drFind(/^fecha del informe/);
+    W.fechaInforme = dte(get('DISPONIBLE REAL', 'C' + (fRow ? fRow.r : 5)));
+    W.impuestos = {};
+    var iImp = -1; for (var di = 0; di < DR.length; di++) if (/impuestos/.test(DR[di].key) && /^\(/.test(DR[di].key)) { iImp = di; break; }
+    if (iImp >= 0) for (var dj = iImp + 1; dj < DR.length; dj++) { var e = DR[dj]; if (/^\(|^disponible|^total|^nota/.test(e.key)) break; W.impuestos[e.lbl] = e.v; }
+    if (iImp < 0) W.avisoEstructura = 'No se encontró el bloque “(–) IMPUESTOS” en la hoja DISPONIBLE REAL.';
     W.tarjetas = num(get('DISPONIBLE DISTRIBUIR', 'B13'));
     W.reservaImp = num(get('DISPONIBLE DISTRIBUIR', 'B14'));
     W.reservaManual = num(get('FLUJO 14D', 'E6'));
@@ -1016,9 +1032,9 @@ var MX = (function () {
     // Cifras que calculó el Excel (para cotejar)
     W.excel = {
       fecha: W.fechaInforme,
-      caja: num(get('DISPONIBLE REAL', 'E7')), disponible: num(get('DISPONIBLE REAL', 'E23')),
-      pendProv: num(get('DISPONIBLE REAL', 'E14')), pendPers: num(get('DISPONIBLE REAL', 'E15')), pendServ: num(get('DISPONIBLE REAL', 'E16')), pendGast: num(get('DISPONIBLE REAL', 'E17')),
-      mega: num(get('DISPONIBLE REAL', 'E9'))
+      caja: drVal(/^saldo en caja y bancos/), disponible: drVal(/^disponible real$/),
+      pendProv: drVal(/^proveedores/), pendPers: drVal(/^personal/), pendServ: drVal(/^servicios/), pendGast: drVal(/^gastos varios/),
+      mega: drVal(/megamas/), megaEnDisponible: !!drFind(/^total disponible/)
     };
     W.cargado = new Date().toISOString();
     return W;
@@ -1199,6 +1215,8 @@ var MX = (function () {
     if (R.imp === 0) a.push({ n: 'amarillo', t: 'No hay impuestos provisionados', d: 'ICO, retención, ICA e IVA están en $0 en la hoja DISPONIBLE REAL. El disponible real no descuenta impuestos por pagar.' });
     if (R.disp < 0 && R.dispExcel > 0) a.push({ n: 'rojo', t: 'El disponible solo da positivo si se cobran las otras cuentas por cobrar', d: 'Con caja, bancos y MEGAMAS da ' + fmt(R.disp) + '. Si se cobraran empleados, socios y otros (' + fmt(R.otrasCxc) + ') daría ' + fmt(R.dispExcel) + ', que es la cifra del Excel.' });
     else if (R.disp < 0) a.push({ n: 'rojo', t: 'Disponible real negativo', d: 'Caja, bancos y MEGAMAS no alcanzan para los pagos programados: faltan ' + fmt(-R.disp) + '.' });
+    if (W.avisoEstructura) a.push({ n: 'rojo', t: 'El Excel cambió de estructura', d: W.avisoEstructura + ' Revise los valores antes de usarlos.' });
+    if (W.excel && W.excel.megaEnDisponible && D === W.fechaInforme && Math.abs(R.disp - W.excel.disponible) > 2) a.push({ n: 'rojo', t: 'El disponible real no coincide con el Excel', d: 'La app calcula ' + fmt(R.disp) + ' y el Excel muestra ' + fmt(W.excel.disponible) + '. Puede que la hoja DISPONIBLE REAL haya cambiado.' });
     var dd = dia(W, D);
     if (Math.abs(dd.dif) > 1000) a.push({ n: 'info', t: 'Diferencia por conciliar', d: fmt(dd.dif) + ' entre el saldo según movimientos del día y el saldo en libros por cuenta. Suele ser un pago registrado sin caja o banco.' });
     var rojo = R.flujo.dias.filter(function (x) { return x.sem === 'rojo'; });

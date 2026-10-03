@@ -1,8 +1,15 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 1.8
+  Flujo de Caja La Matriarca — versión 1.9
 
   HISTORIAL DE VERSIONES
+  v1.9 (2 oct 2026) — Ingresos y egresos completos.
+    · Nuevo módulo "Egresos y gastos": todo lo causado (pagado y sin pagar)
+      por concepto y por tipo, con selector de mes y de periodo
+      (todo el mes, una semana o un rango de fechas), egresos por semana,
+      por mes, gráfica por día y el detalle por tercero con su estado.
+    · "Ventas" pasa a ser "Ventas e ingresos": suma otros ingresos
+      (cartera, abonos, reintegros) y muestra el total de ingresos.
   v1.8 (2 oct 2026) — Totales de cuentas por pagar más claros.
     · "Total por concepto" (proveedores, servicios, personal, gastos varios)
       con su total, que es igual a vencido + sin fecha.
@@ -64,7 +71,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="1.8">
+<meta name="version" content="1.9">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -81,7 +88,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "1.8";
+window.MX_VERSION = "1.9";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -332,6 +339,15 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
 .row-2 small{display:block;font-size:12.5px;font-weight:400;color:var(--muted);margin-top:1px}
 .row-2>span:first-child{color:var(--ink);font-weight:600}
 
+.pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.pick>label{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;min-width:58px}
+.pick .seg{border-radius:14px}
+.pick .seg button{text-transform:capitalize}
+.pick .seg button[data-eper]{text-transform:none}
+input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface);font-size:15px}
+.row-btn.on>span:first-child{color:var(--accent)}
+.row-btn.on{background:var(--accent-soft);margin:0 -8px;padding-left:8px;padding-right:8px;width:calc(100% + 16px);border-radius:8px}
+
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
 #gate{min-height:100vh;min-height:100dvh;background:var(--deep)}
@@ -405,9 +421,9 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
 .g-panel .g-form input:disabled{opacity:.6}
 .m-grid .m-tile:not(.m-out){grid-column:1/-1;min-height:0;grid-template-columns:auto 1fr;align-items:center;column-gap:14px}
 .m-grid .m-tile:not(.m-out) .m-ic{grid-row:span 2}
-.m-grid .m-tile[data-ir=ventas],.m-grid .m-tile[data-ir=pagar]{border-color:var(--gold)}
-.m-grid .m-tile[data-ir=ventas] .m-ic,.m-grid .m-tile[data-ir=pagar] .m-ic{width:52px;height:52px;background:linear-gradient(180deg,#D8B56B,#B88E43);color:#1D1608}
-.m-grid .m-tile[data-ir=ventas] b,.m-grid .m-tile[data-ir=pagar] b{font-size:19px}
+.m-grid .m-main{border-color:var(--gold)}
+.m-grid .m-main .m-ic{width:48px;height:48px;background:linear-gradient(180deg,#D8B56B,#B88E43);color:#1D1608}
+.m-grid .m-main b{font-size:18px}
 
 .g-pw{position:relative;display:block}
 .g-pw input{width:100%;padding-right:48px !important}
@@ -416,6 +432,11 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
 .g-panel .g-eye{color:var(--muted)}
 
 .scr-in{gap:12px}
+
+.m-grid .m-tile:not(.m-out){padding:14px}
+.m-tile:first-child .m-ic{width:48px;height:48px}
+.m-tile:first-child b{font-size:18px}
+.scr-in{gap:10px}.m-grid{gap:10px}
 </style>
 </head>
 <body>
@@ -427,7 +448,7 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
   var pending = null; // {name} cuando se ve un Excel cargado sin guardar
   var M = MX.money, F = MX.fecha;
   var TABS = [['resumen', 'Resumen'], ['ventas', 'Ventas'], ['pagar', 'Por pagar'], ['cobrar', 'Por cobrar'], ['bancos', 'Bancos y cajas'], ['dia', 'Movimiento del día'], ['semanas', 'Semanas'], ['flujo', 'Próximos 14 días']];
-  var S = { tab: 'resumen', D: null, cat: 'all', est: 'pend', q: '', mCat: 'all', pVista: 'pend', pCat: 'prov', pEst: 'all', pSem: null, vPunto: 'all', vVista: 'dia', vRango: 'mes', vIco: 'reg', recaudo: null, reserva: null, open: {} };
+  var S = { tab: 'resumen', D: null, cat: 'all', est: 'pend', q: '', mCat: 'all', eMes: null, ePer: 'all', eDesde: null, eHasta: null, eCat: 'all', eEst: 'all', eVerTodo: false, pVista: 'pend', pCat: 'prov', pEst: 'all', pSem: null, vPunto: 'all', vVista: 'dia', vRango: 'mes', vIco: 'reg', recaudo: null, reserva: null, open: {} };
   try { var t = localStorage.getItem('mx-tab'); if (t && TABS.some(function (x) { return x[0] === t; })) S.tab = t; } catch (e) {}
   try { var h = location.hash.replace('#', ''); if (h && TABS.some(function (x) { return x[0] === h; })) S.tab = h; } catch (e) {}
   var artifactNS = null;
@@ -451,7 +472,7 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
   var root = document.getElementById('app');
   var MODE = window.MX_MODE || 'caja';
   window.MX_SETMODE = function (m) { MODE = m; window.scrollTo(0, 0); render(); };
-  var SOLO = { ventas: 'Ventas', pagar: 'Cuentas por pagar' };
+  var SOLO = { ventas: 'Ventas e ingresos', egresos: 'Egresos y gastos', pagar: 'Cuentas por pagar' };
   function tabsVisibles() { return SOLO[MODE] ? [] : (window.MX_NAV ? TABS.filter(function (t) { return !SOLO[t[0]]; }) : TABS); }
   function render() {
     if (SOLO[MODE]) S.tab = MODE;
@@ -465,7 +486,7 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
       (window.MX_NAV ? '\x3cbutton class="nav-back" id="nav-back" aria-label="Volver al menú">‹\x3c/button>' : '') +
       '\x3cdiv class="brand">\x3csmall>La Matriarca · Tesorería' + (window.MX_VERSION ? ' · v' + window.MX_VERSION : '') + '\x3c/small>\x3cb>' + (SOLO[MODE] || 'Flujo de caja') + '\x3c/b>\x3c/div>' +
       (window.MX_NAV ? '\x3cbutton class="nav-exit" id="nav-exit">Salir\x3c/button>' : '') +
-      '\x3cdiv class="datebox" role="group" aria-label="Fecha de corte">\x3cbutton id="d-prev" aria-label="Día anterior">‹\x3c/button>\x3cinput type="date" id="d-in" value="' + iso(S.D) + '" min="' + iso(b.min) + '" max="' + iso(b.max + 30) + '" aria-label="Fecha de corte">\x3cbutton id="d-next" aria-label="Día siguiente">›\x3c/button>\x3c/div>' +
+      (MODE === 'egresos' ? '' : '\x3cdiv class="datebox" role="group" aria-label="Fecha de corte">\x3cbutton id="d-prev" aria-label="Día anterior">‹\x3c/button>\x3cinput type="date" id="d-in" value="' + iso(S.D) + '" min="' + iso(b.min) + '" max="' + iso(b.max + 30) + '" aria-label="Fecha de corte">\x3cbutton id="d-next" aria-label="Día siguiente">›\x3c/button>\x3c/div>') +
       (window.MX_ROLE === 'lector' || SOLO[MODE] ? '' : '\x3clabel class="btn pri" for="file-in">Cargar Excel\x3cspan class="hide-xs"> del día\x3c/span>\x3c/label>') + '\x3cinput type="file" id="file-in" accept=".xlsx,.xlsm,.xls" hidden>' +
       '\x3c/div>\x3c/div>' + (SOLO[MODE] ? '' : '\x3cdiv class="tabbar">\x3cnav class="wrap tabs" role="tablist">') + tabsVisibles().map(function (t) {
         var ct = t[0] === 'pagar' ? '\x3cspan class="ct">' + mm(R.pend.tAll) + '\x3c/span>' : t[0] === 'resumen' && A.filter(function (a) { return a.n === 'rojo'; }).length ? '\x3cspan class="ct">' + A.filter(function (a) { return a.n === 'rojo'; }).length + ' alertas\x3c/span>' : '';
@@ -475,7 +496,7 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
     if (pending) html += '\x3cdiv class="banner">\x3cspan>Está viendo \x3cb>' + esc(pending.name) + '\x3c/b>, cargado ahora. ' + (artifactNS ? 'Guárdelo para que esta página lo muestre a todos.' : 'Solo usted lo ve en este dispositivo; para guardarlo para todos, ábralo con una cuenta con permiso de edición.') + '\x3c/span>\x3cspan style="display:flex;gap:8px">' + (artifactNS ? '\x3cbutton class="btn pri" id="save">Guardar para todos\x3c/button>' : '') + '\x3cbutton class="btn" id="discard">Volver a los datos guardados\x3c/button>\x3c/span>\x3c/div>';
     if (S.err) html += '\x3cdiv class="banner err">\x3cspan>' + esc(S.err) + '\x3c/span>\x3cbutton class="btn" id="err-x">Cerrar\x3c/button>\x3c/div>';
     if (S.tab !== 'resumen') html += '\x3cdiv class="meta">Datos del Excel “Tesorería Integrada” · fecha del informe en el archivo: ' + F(W.fechaInforme, true) + ' · control desde el ' + F(W.inicio, true) + ' · cargado ' + fmtStamp(W.cargado) + '\x3c/div>';
-    html += ({ ventas: vVentas, resumen: vResumen, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
+    html += ({ egresos: vEgresos, ventas: vVentas, resumen: vResumen, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
     html += '\x3c/main>\x3cdiv id="tip" hidden>\x3c/div>';
     var sy = window.scrollY;
     root.innerHTML = html;
@@ -617,7 +638,7 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
     var diasIco = V.dias.filter(function (d) { return d.icoReg; });
     var primerIco = diasIco.length ? diasIco[0].f : null;
     var ptNom = { all: 'Calle 80 y Mall Plaza', c80: 'Calle 80', mp: 'Mall Plaza' }[pt];
-    var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Ventas\x3c/h2>\x3cspan class="meta">' + ptNom + ' · ' + (dias.length ? 'del ' + F(dias[0].d.f) + ' al ' + F(dias[dias.length - 1].d.f) + ' · ' + dias.length + ' días con venta' : 'sin ventas en el período') + '\x3c/span>\x3c/div>\x3c/div>';
+    var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Ventas e ingresos\x3c/h2>\x3cspan class="meta">' + ptNom + ' · ' + (dias.length ? 'del ' + F(dias[0].d.f) + ' al ' + F(dias[dias.length - 1].d.f) + ' · ' + dias.length + ' días con venta' : 'sin ventas en el período') + '\x3c/span>\x3c/div>\x3c/div>';
     h += '\x3cdiv class="filters">' + seg('vPunto', [['all', 'Ambos puntos'], ['c80', 'Calle 80'], ['mp', 'Mall Plaza']]) + seg('vVista', [['dia', 'Por día'], ['semana', 'Por semana']]) +
       seg('vRango', [['mes', 'Mes actual'], ['todo', 'Desde el inicio']]) + seg('vIco', [['reg', 'ICO registrado'], ['est', 'Estimar ICO faltante']]) + '\x3c/div>';
     // Tarjetas
@@ -641,6 +662,15 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
     if (V.icoOtros.length) av.push('No se tomó como ICO del día el registro “' + esc(V.icoOtros[0].desc) + '” por ' + M(V.icoOtros.reduce(function (s, i) { return s + i.v; }, 0)) + ', porque no corresponde a un cierre.');
     if (diasIco.length) { var r = diasIco.reduce(function (s, d) { return s + d.ico; }, 0) / diasIco.reduce(function (s, d) { return s + d.total; }, 0); av.push('En los días con registro, el ICO equivale al ' + (r * 100).toFixed(1).replace('.', ',') + '% de la venta; un ICO del 8% incluido en el precio daría 7,4%.'); }
     h += '\x3cdiv class="alert info">\x3cspan class="ic" aria-hidden="true">i\x3c/span>\x3cb>Sobre estos datos\x3c/b>\x3cul class="av">' + av.map(function (t) { return '\x3cli>' + t + '\x3c/li>'; }).join('') + '\x3c/ul>\x3c/div>';
+    // Otros ingresos (cartera, abonos, reintegros) del mismo periodo
+    var oi = { 'Recaudo de cartera': 0, 'Abonos de clientes': 0, 'Otros ingresos': 0 };
+    W.ing.forEach(function (i) { if (i.f < desde || i.f > D || /^venta/i.test(i.tipo) || MX.isICO(i.tipo)) return; oi[/recaudo/i.test(i.tipo) ? 'Recaudo de cartera' : /abono/i.test(i.tipo) ? 'Abonos de clientes' : 'Otros ingresos'] += i.v; });
+    var reintV = W.mega.reduce(function (s, m) { return s + (m.f >= desde && m.f <= D && /reintegro/i.test(m.tipo) && m.banco && !/pago de proveedor|compra insumos/i.test(m.banco) ? m.v : 0); }, 0);
+    var oiT = oi['Recaudo de cartera'] + oi['Abonos de clientes'] + oi['Otros ingresos'] + reintV;
+    var ventaAmbos = V.dias.reduce(function (s, d) { return s + d.total; }, 0);
+    h += '\x3csection class="cards2">' +
+      card({ icon: 'cobrar', title: 'Otros ingresos', sub: 'Plata que entró y no es venta del día · ambos puntos', body: Object.keys(oi).map(function (k) { return row(k, oi[k]); }).join('') + row('Reintegros de MEGAMAS', reintV), totalLbl: 'Total otros ingresos', total: oiT, tone: 'pos' }) +
+      card({ icon: 'sum', title: 'Total ingresos', sub: 'Ventas más otros ingresos · ambos puntos', cls: 'big', body: row('Ventas del día (Calle 80 y Mall Plaza)', ventaAmbos) + row('Otros ingresos', oiT), totalLbl: 'Total ingresos', total: ventaAmbos + oiT, tone: 'good' }) + '\x3c/section>';
     // Medios de pago + propinas pagadas
     var pp = V.propPag.reduce(function (s, p) { return s + (p.pagado || p.valor); }, 0);
     h += '\x3csection class="cards2">' +
@@ -837,6 +867,113 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
       '\x3cp class="note">Cada factura va en la semana de su fecha de compra (lunes a domingo). “Pagado” suma los abonos que ya tienen fecha de pago en el Excel.\x3c/p>\x3c/section>';
     return h;
   }
+  /* ---------- EGRESOS Y GASTOS (causados: pagados y sin pagar) ---------- */
+  var MESN = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function mesDe(f) { var d = MX.toJS(f); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }
+  function mesIni(k) { return MX.fromJS(new Date(Date.UTC(Math.floor(k / 12), k % 12, 1))); }
+  function mesFin(k) { return MX.fromJS(new Date(Date.UTC(Math.floor(k / 12), k % 12 + 1, 0))); }
+  function mesNom(k) { return MESN[k % 12] + ' ' + Math.floor(k / 12); }
+  function tipoDe(x) { return (x.cat === 'pers' ? x.concepto : x.sub) || 'Sin clasificar'; }
+  function egresosRango(todas) {
+    var a = -1e9, b = 1e9, lbl = 'Todo el registro';
+    if (S.eMes !== 'all') { a = mesIni(S.eMes); b = mesFin(S.eMes); lbl = mesNom(S.eMes); }
+    if (S.ePer === 'rango') { a = S.eDesde != null ? S.eDesde : a; b = S.eHasta != null ? S.eHasta : b; lbl = 'Del ' + F(a) + ' al ' + F(b); }
+    else if (S.ePer !== 'all') { var l = +S.ePer; a = Math.max(a, l); b = Math.min(b, l + 6); lbl = 'Del ' + F(a) + ' al ' + F(b); }
+    return { a: a, b: b, lbl: lbl };
+  }
+  function vEgresos() {
+    var todas = MX.facturas(W).filter(function (x) { return x.fDoc != null; });
+    var meses = {}; todas.forEach(function (x) { meses[mesDe(x.fDoc)] = 1; });
+    var ml = Object.keys(meses).map(Number).sort(function (a, b) { return a - b; });
+    if (S.eMes == null) { var md = mesDe(S.D); S.eMes = meses[md] ? md : (ml.length ? ml[ml.length - 1] : md); }
+    var rg = egresosRango(todas), a = rg.a, b = rg.b;
+    var enMes = todas.filter(function (x) { return S.eMes === 'all' || mesDe(x.fDoc) === S.eMes; });
+    var fs = todas.filter(function (x) { return x.fDoc >= a && x.fDoc <= b; });
+    // semanas del mes (lunes a domingo, recortadas al mes)
+    var sem = {}; enMes.forEach(function (x) { var l = MX.lunesDe(x.fDoc); var w = sem[l] || (sem[l] = { l: l, prov: 0, serv: 0, pers: 0, gast: 0, tot: 0, pag: 0, sal: 0 }); w[x.cat] += x.valor; w.tot += x.valor; w.pag += x.pagado; w.sal += x.saldo; });
+    var sl = Object.keys(sem).map(function (k) { return sem[k]; }).sort(function (p, q) { return p.l - q.l; });
+    function semLbl(l) { var i = l, f = l + 6; if (S.eMes !== 'all') { i = Math.max(i, mesIni(S.eMes)); f = Math.min(f, mesFin(S.eMes)); } return F(i) + ' – ' + F(f); }
+    var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Egresos y gastos\x3c/h2>\x3cspan class="meta">Todo lo causado, pagado o sin pagar · ' + rg.lbl + '\x3c/span>\x3c/div>\x3c/div>';
+    h += '\x3cdiv class="pick">\x3clabel>Mes\x3c/label>\x3cdiv class="seg" role="group">\x3cbutton data-emes="all" aria-pressed="' + (S.eMes === 'all') + '">Todo\x3c/button>' + ml.map(function (k) { return '\x3cbutton data-emes="' + k + '" aria-pressed="' + (S.eMes === k) + '">' + mesNom(k).replace(/^(...).* /, '$1 ') + '\x3c/button>'; }).join('') + '\x3c/div>\x3c/div>';
+    h += '\x3cdiv class="pick">\x3clabel>Periodo\x3c/label>\x3cdiv class="seg" role="group">\x3cbutton data-eper="all" aria-pressed="' + (S.ePer === 'all') + '">' + (S.eMes === 'all' ? 'Todo' : 'Todo el mes') + '\x3c/button>' +
+      (S.eMes === 'all' ? '' : sl.map(function (w) { return '\x3cbutton data-eper="' + w.l + '" aria-pressed="' + (String(S.ePer) === String(w.l)) + '">' + semLbl(w.l) + '\x3c/button>'; }).join('')) +
+      '\x3cbutton data-eper="rango" aria-pressed="' + (S.ePer === 'rango') + '">Otro rango\x3c/button>\x3c/div>\x3c/div>';
+    if (S.ePer === 'rango') h += '\x3cdiv class="pick">\x3clabel for="e-desde">Desde\x3c/label>\x3cinput type="date" class="dt" id="e-desde" value="' + (a > -1e8 ? iso(a) : '') + '">\x3clabel for="e-hasta">Hasta\x3c/label>\x3cinput type="date" class="dt" id="e-hasta" value="' + (b < 1e8 ? iso(b) : '') + '">\x3c/div>';
+    // Totales
+    var T = { prov: 0, serv: 0, pers: 0, gast: 0 }, pag = 0, sal = 0, nP = 0;
+    fs.forEach(function (x) { T[x.cat] += x.valor; pag += x.pagado; sal += x.saldo; if (x.estado === 'pend' || x.estado === 'abono') nP++; });
+    var tot = T.prov + T.serv + T.pers + T.gast, pct = tot > 0 ? Math.round(Math.min(1, pag / tot) * 100) : 0;
+    var dias = (a > -1e8 && b < 1e8) ? (b - a + 1) : 0;
+    h += '\x3csection class="cards2">' +
+      card({ icon: 'pagos', title: 'Egresos causados', sub: fs.length + ' documentos · ' + rg.lbl, cls: 'big',
+        body: Object.keys(CATN).map(function (k) { return '\x3cbutton class="row row-btn" data-ecat="' + k + '">\x3cspan>' + CATN[k] + ' ›\x3c/span>' + amt(T[k]) + '\x3c/button>'; }).join(''),
+        totalLbl: 'Total egresos', total: tot, tone: 'bad' }) +
+      card({ icon: 'res', title: 'Pagado y por pagar', sub: pct + '% pagado',
+        body: '\x3cdiv class="bar-pct" role="img" aria-label="' + pct + '% pagado">\x3ci style="width:' + pct + '%">\x3c/i>\x3c/div>' + row('Total causado', tot) + row('Ya pagado', -pag),
+        totalLbl: 'Pendiente por pagar · ' + nP + ' documentos', total: sal, tone: sal > 0.5 ? 'neg' : 'pos' }) + '\x3c/section>';
+    // Por tipo
+    function porTipo(cat) { var t = {}; fs.forEach(function (x) { if (x.cat === cat) { var k = tipoDe(x); t[k] = (t[k] || 0) + x.valor; } }); return Object.keys(t).map(function (k) { return [k, t[k]]; }).sort(function (p, q) { return q[1] - p[1]; }); }
+    var defs = [['prov', 'Proveedores por tipo de producto', 'Insumos y compras', 'pagos'], ['pers', 'Personal por concepto', 'Salarios, turnos, música, propinas', 'deuda'], ['serv', 'Servicios por tipo', 'Arriendo, administración, servicios públicos', 'imp'], ['gast', 'Gastos varios por categoría', 'Impuestos, mantenimiento, otros', 'deuda']];
+    var tc = defs.map(function (d) { var r = porTipo(d[0]); if (!r.length) return ''; return card({ icon: d[3], title: d[1], sub: d[2], body: r.map(function (x) { return '\x3cbutton class="row row-btn" data-etipo="' + d[0] + '|' + esc(x[0]) + '">\x3cspan>' + esc(x[0]) + ' ›\x3c/span>' + amt(x[1]) + '\x3c/button>'; }).join(''), totalLbl: 'Total ' + CATN[d[0]].toLowerCase(), total: T[d[0]] }); }).filter(Boolean);
+    for (var i = 0; i < tc.length; i += 2) h += '\x3csection class="cards2">' + tc.slice(i, i + 2).join('') + '\x3c/section>';
+    // Gráfica por día
+    if (dias && dias <= 62) { h += '\x3csection class="sec">\x3cdiv class="sec-head">\x3ch2>Egresos por día\x3c/h2>\x3cspan class="meta">Según la fecha de la factura o del gasto\x3c/span>\x3c/div>\x3cdiv class="panel">' + barEgresos(fs, a, b) + '\x3c/div>\x3c/section>'; }
+    // Por semana / por mes
+    if (S.eMes === 'all') {
+      var mm_ = {}; todas.forEach(function (x) { var k = mesDe(x.fDoc); var o = mm_[k] || (mm_[k] = { k: k, prov: 0, serv: 0, pers: 0, gast: 0, tot: 0, sal: 0 }); o[x.cat] += x.valor; o.tot += x.valor; o.sal += x.saldo; });
+      h += card({ icon: 'sum', title: 'Egresos por mes', sub: 'Toque un mes para verlo', body: ml.map(function (k) { var o = mm_[k]; return '\x3cbutton class="row row-btn row-2" data-emes="' + k + '">\x3cspan>' + mesNom(k) + ' ›\x3csmall>' + partes(o) + '\x3c/small>\x3c/span>' + amt(o.tot) + '\x3c/button>'; }).join(''), totalLbl: 'Total', total: todas.reduce(function (s, x) { return s + x.valor; }, 0) });
+    } else {
+      h += card({ icon: 'sum', title: 'Egresos por semana', sub: mesNom(S.eMes) + ' · lunes a domingo · toque una semana', body: sl.map(function (w) { return '\x3cbutton class="row row-btn row-2' + (String(S.ePer) === String(w.l) ? ' on' : '') + '" data-eper="' + w.l + '">\x3cspan>' + semLbl(w.l) + ' ›\x3csmall>' + partes(w) + '\x3c/small>\x3c/span>' + amt(w.tot) + '\x3c/button>'; }).join('') || '\x3cdiv class="empty">Sin egresos en este mes.\x3c/div>', totalLbl: 'Total de ' + mesNom(S.eMes), total: enMes.reduce(function (s, x) { return s + x.valor; }, 0) });
+    }
+    function partes(o) { var p = []; if (o.prov) p.push('Prov. ' + mm(o.prov)); if (o.pers) p.push('Personal ' + mm(o.pers)); if (o.serv) p.push('Serv. ' + mm(o.serv)); if (o.gast) p.push('Gastos ' + mm(o.gast)); if (o.sal > 0.5) p.push('debe ' + mm(o.sal)); return p.join(' · '); }
+    // Detalle
+    h += '\x3csection class="sec" id="detalle">\x3cdiv class="sec-head">\x3ch2>Detalle\x3c/h2>\x3c/div>\x3cdiv class="filters">' + seg('eCat', [['all', 'Todo'], ['prov', 'Proveedores'], ['pers', 'Personal'], ['serv', 'Servicios'], ['gast', 'Gastos']]) + seg('eEst', [['all', 'Todos'], ['pend', 'Sin pagar'], ['pagada', 'Pagados']]) +
+      '\x3cinput class="search" id="q" type="search" placeholder="Buscar tercero, factura, tipo…" value="' + esc(S.q) + '">\x3c/div>';
+    var q = S.q.toLowerCase();
+    var ff = fs.filter(function (x) {
+      if (S.eCat !== 'all' && x.cat !== S.eCat) return false;
+      if (S.eEst === 'pend' && !(x.estado === 'pend' || x.estado === 'abono')) return false;
+      if (S.eEst === 'pagada' && x.estado !== 'pagada') return false;
+      if (q && (x.tercero + ' ' + x.factura + ' ' + x.concepto + ' ' + x.sub).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    var g = {}; ff.forEach(function (x) { var k = x.cat + '|' + x.tercero.toLowerCase(); var t = g[k] || (g[k] = { cat: x.cat, name: x.tercero || '(sin nombre)', items: [], valor: 0, saldo: 0 }); t.items.push(x); t.valor += x.valor; t.saldo += x.saldo; });
+    var gl = Object.keys(g).map(function (k) { return g[k]; }).sort(function (p, q2) { return q2.valor - p.valor; });
+    var MAXG = 60, corte = gl.length > MAXG && !S.eVerTodo;
+    h += '\x3cdiv class="meta">' + gl.length + ' terceros · ' + ff.length + ' documentos · causado ' + M(ff.reduce(function (s, x) { return s + x.valor; }, 0)) + ' · por pagar ' + M(ff.reduce(function (s, x) { return s + x.saldo; }, 0)) + '\x3c/div>';
+    h += '\x3cdiv class="parties">' + (gl.length ? (corte ? gl.slice(0, MAXG) : gl).map(function (t) {
+      var key = 'e|' + t.cat + '|' + t.name, abierto = S.open[key];
+      return '\x3cdetails class="party" data-k="' + esc(key) + '"' + (abierto ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot">' + M(t.valor) + '\x3c/span>' +
+        '\x3cspan class="sub">' + (t.saldo > 0.5 ? chip('rojo', 'Debe ' + M(t.saldo)) : chip('verde', 'Pagado')) + '\x3cspan>' + CATN[t.cat] + '\x3c/span>\x3cspan>' + t.items.length + (t.items.length === 1 ? ' documento' : ' documentos') + '\x3c/span>\x3c/span>\x3c/summary>' +
+        (abierto ? filasFx(t.items, S.D) : '\x3cdiv class="fxs" data-lazy="1">\x3c/div>') + '\x3c/details>';
+    }).join('') : '\x3cdiv class="empty">No hay egresos con estos filtros.\x3c/div>') + '\x3c/div>' +
+      (corte ? '\x3cbutton class="btn" id="e-todo">Ver los ' + gl.length + ' terceros\x3c/button>' : '') +
+      '\x3cp class="note">Cada egreso va en la fecha de su factura; el personal y los gastos varios, que no tienen fecha de factura en el Excel, van en su fecha de programación.\x3c/p>\x3c/section>';
+    return h;
+  }
+  function filasFx(items, D) {
+    return '\x3cdiv class="fxs">' + items.slice().sort(function (p, q) { return p.fDoc - q.fDoc; }).map(function (x) {
+      var e = EST_F[x.estado];
+      var det = x.estado === 'pagada' ? (x.ultPago ? 'Pagada el ' + F(x.ultPago) : '') : x.estado === 'nc' ? (x.saldo < -0.5 ? 'Por aplicar' : 'Aplicada') : (x.fProg ? 'Programada ' + F(x.fProg) + (x.fProg < D ? ' · vencida' : '') : 'Sin programar');
+      return '\x3cdiv class="fx">\x3cdiv class="fx-a">\x3cb>' + esc(x.factura && x.factura !== 'NO' ? x.factura : (x.concepto || '—')) + '\x3c/b>\x3cspan class="meta">' + F(x.fDoc) + ' · ' + esc(tipoDe(x)) + '\x3c/span>\x3c/div>' +
+        '\x3cdiv class="fx-b">' + chip(e[0], e[1]) + '\x3cspan class="meta">' + det + '\x3c/span>\x3c/div>' +
+        '\x3cdiv class="fx-c">\x3cspan>\x3csmall>Valor\x3c/small>' + M(x.valor) + '\x3c/span>\x3cspan>\x3csmall>Pagado\x3c/small>' + M(x.pagado) + '\x3c/span>\x3cspan' + (x.saldo > 0.5 ? ' class="neg"' : '') + '>\x3csmall>Saldo\x3c/small>\x3cb>' + M(x.saldo) + '\x3c/b>\x3c/span>\x3c/div>\x3c/div>';
+    }).join('') + '\x3c/div>';
+  }
+  function barEgresos(fs, a, b) {
+    var n = b - a + 1, tot = []; for (var i = 0; i < n; i++) tot.push(0);
+    fs.forEach(function (x) { tot[x.fDoc - a] += x.valor; });
+    var w = CW(), hh = 220, pl = 58, pr = 8, pt = 10, pb = 26, mx = nice(Math.max.apply(null, tot.concat([1]))), bw = (w - pl - pr) / n;
+    var s = '\x3csvg class="chart" viewBox="0 0 ' + w + ' ' + hh + '" role="img" aria-label="Egresos causados por día">';
+    for (var k = 0; k <= 4; k++) { var y = pt + (hh - pt - pb) * (1 - k / 4); s += '\x3cline class="grid" x1="' + pl + '" x2="' + (w - pr) + '" y1="' + y + '" y2="' + y + '"/>\x3ctext x="' + (pl - 6) + '" y="' + (y + 4) + '" text-anchor="end">' + mm(mx * k / 4) + '\x3c/text>'; }
+    var step = Math.ceil(n / Math.max(2, Math.floor((w - pl) / 52)));
+    tot.forEach(function (v, j) {
+      var bh = (hh - pt - pb) * Math.max(0, v) / mx, x = pl + j * bw + 1;
+      if (v > 0) s += '\x3crect x="' + x + '" y="' + (hh - pb - bh) + '" width="' + Math.max(1, bw - 2) + '" height="' + bh + '" rx="2" fill="var(--s2)" data-tip="' + esc(F(a + j, true) + ': ' + M(v)) + '"/>';
+      if (j % step === 0) s += '\x3ctext x="' + (x + bw / 2) + '" y="' + (hh - 8) + '" text-anchor="middle">' + F(a + j) + '\x3c/text>';
+    });
+    return s + '\x3c/svg>';
+  }
   function stTile(k, lbl, v, n) { var on = S.est === k; return '\x3cbutton class="tile" data-est="' + k + '" style="text-align:left;' + (on ? 'border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)' : '') + '">\x3cspan class="k">' + lbl + '\x3c/span>\x3cspan class="v' + (k === 'venc' && v > 0 ? ' neg' : '') + '">' + M(v) + '\x3c/span>\x3cspan class="n">' + n + '\x3c/span>\x3c/button>'; }
   function seg(key, opts) { return '\x3cdiv class="seg" role="group">' + opts.map(function (o) { return '\x3cbutton data-seg="' + key + '" data-v="' + o[0] + '" aria-pressed="' + (S[key] === o[0]) + '">' + o[1] + '\x3c/button>'; }).join('') + '\x3c/div>'; }
 
@@ -1000,15 +1137,22 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
     root.querySelectorAll('[data-go]').forEach(function (b) { b.onclick = function () { var t = b.dataset.go; if (window.MX_NAV && SOLO[t]) window.MX_NAV(t); else go(t); }; });
     root.querySelectorAll('[data-seg]').forEach(function (b) { b.onclick = function () { S[b.dataset.seg] = b.dataset.v; render(); }; });
     root.querySelectorAll('[data-est]').forEach(function (b) { b.onclick = function () { S.est = S.est === b.dataset.est ? 'pend' : b.dataset.est; render(); }; });
-    root.querySelectorAll('details.party').forEach(function (d) { d.ontoggle = function () { S.open[d.dataset.k] = d.open; }; });
+    root.querySelectorAll('details.party').forEach(function (d) { d.ontoggle = function () { S.open[d.dataset.k] = d.open; if (d.open && d.querySelector('[data-lazy]')) render(); }; });
     root.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { var p = b.dataset.tipo.split('|'); S.cat = p[0]; S.est = 'pend'; S.q = !p[1] || p[1] === 'Sin clasificar' ? '' : p[1]; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
+    root.querySelectorAll('[data-emes]').forEach(function (b) { b.onclick = function () { S.eMes = b.dataset.emes === 'all' ? 'all' : +b.dataset.emes; S.ePer = 'all'; S.eDesde = S.eHasta = null; S.eVerTodo = false; window.scrollTo(0, 0); render(); }; });
+    root.querySelectorAll('[data-eper]').forEach(function (b) { b.onclick = function () { var v = b.dataset.eper; S.ePer = (v === 'all' || v === 'rango') ? v : (String(S.ePer) === v ? 'all' : +v); if (v === 'rango' && S.eMes !== 'all' && S.eDesde == null) { S.eDesde = mesIni(S.eMes); S.eHasta = mesFin(S.eMes); } S.eVerTodo = false; if (b.classList.contains('row-btn')) window.scrollTo(0, 0); render(); }; });
+    root.querySelectorAll('[data-ecat]').forEach(function (b) { b.onclick = function () { S.eCat = b.dataset.ecat; S.q = ''; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
+    root.querySelectorAll('[data-etipo]').forEach(function (b) { b.onclick = function () { var p = b.dataset.etipo.split('|'); S.eCat = p[0]; S.eEst = 'all'; S.q = p[1] === 'Sin clasificar' ? '' : p[1]; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
+    var ed = document.getElementById('e-desde'), eh = document.getElementById('e-hasta');
+    if (ed) ed.onchange = function () { S.eDesde = ed.value ? fromIso(ed.value) : null; render(); };
+    if (eh) eh.onchange = function () { S.eHasta = eh.value ? fromIso(eh.value) : null; render(); };
+    var et = document.getElementById('e-todo'); if (et) et.onclick = function () { S.eVerTodo = true; render(); };
     root.querySelectorAll('[data-sem]').forEach(function (b) { b.onclick = function () { S.pSem = +b.dataset.sem; window.scrollTo(0, 0); render(); }; });
     var wp = document.getElementById('w-prev'); if (wp) wp.onclick = function () { S.pSem = semVecina(1); render(); };
     var wn = document.getElementById('w-next'); if (wn) wn.onclick = function () { S.pSem = semVecina(-1); render(); };
     var din = document.getElementById('d-in');
-    din.onchange = function () { if (din.value) { S.D = fromIso(din.value); render(); } };
-    document.getElementById('d-prev').onclick = function () { S.D--; render(); };
-    document.getElementById('d-next').onclick = function () { S.D++; render(); };
+    if (din) din.onchange = function () { if (din.value) { S.D = fromIso(din.value); render(); } };
+    if (din) { document.getElementById('d-prev').onclick = function () { S.D--; render(); }; document.getElementById('d-next').onclick = function () { S.D++; render(); }; }
     var q = document.getElementById('q');
     if (q) q.oninput = function () { S.q = q.value; var pos = q.selectionStart; render(); var n = document.getElementById('q'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (e) {} };
     var nb = document.getElementById('nav-back'); if (nb) nb.onclick = function () { window.MX_NAV('menu'); };
@@ -1658,6 +1802,7 @@ if (typeof module !== 'undefined') module.exports = MX;
 
   /* ---------- Menú principal y navegación ---------- */
   var ICO = {
+    egresos: '\x3cpath d="M4 5v14M4 5h16"/>\x3cpath d="M8 9l3.5 4 3-2.5L19 16"/>\x3cpath d="M15 16h4v-4"/>',
     pagar: '\x3cpath d="M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21z"/>\x3cpath d="M10 8h4M10 12h4"/>',
     ventas: '\x3cpath d="M4 19V5M4 19h16"/>\x3cpath d="M8 15l3.5-4 3 2.5L19 8"/>\x3cpath d="M15 8h4v4"/>',
     caja: '\x3cpath d="M3 9.5 12 4l9 5.5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
@@ -1669,12 +1814,12 @@ if (typeof module !== 'undefined') module.exports = MX;
   function quien() { return perfil && perfil.nombre ? perfil.nombre : (auth.currentUser ? auth.currentUser.email : ''); }
   function menu(msg) {
     hideApp(); gate.hidden = false; gate.className = ''; window.scrollTo(0, 0);
-    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['ventas', 'Ventas', 'Ventas por día, por punto, impoconsumo y propinas'], ['pagar', 'Cuentas por pagar', 'Pendientes por proveedor y por semana, pagas y sin pagar']];
+    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['ventas', 'Ventas e ingresos', 'Ventas por día y por punto, impoconsumo y otros ingresos'], ['egresos', 'Egresos y gastos', 'Todo lo causado por mes, semana o periodo, pagado y sin pagar'], ['pagar', 'Cuentas por pagar', 'Pendientes por proveedor y por semana, pagas y sin pagar']];
     if (esAdmin()) items.push(['users', 'Administración de usuarios', 'Crear, editar y eliminar usuarios']);
     items.push(['salir', 'Salir', 'Cerrar sesión y volver al ingreso']);
     gate.innerHTML = '\x3cdiv class="scr">\x3cdiv class="scr-in">\x3cdiv class="m-hi">\x3csmall>Bienvenido\x3c/small>\x3cb>' + esc(quien()) + '\x3c/b>\x3cspan>' + esc(ROLES[window.MX_ROLE] || '') + '\x3c/span>\x3c/div>' +
       (msg ? '\x3cp class="g-ok">' + esc(msg) + '\x3c/p>' : '') +
-      '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
+      '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + (/^(ventas|egresos|pagar)$/.test(it[0]) ? ' m-main' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
       (esAdmin() ? '' : '\x3cbutton class="g-link" type="button" data-ir="clave">Cambiar mi contraseña\x3c/button>') +
       '\x3cp class="g-ver">Versión ' + esc(window.MX_VERSION || '') + '\x3c/p>\x3c/div>\x3c/div>';
     gate.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { b.dataset.ir === 'salir' ? cerrar() : ir(b.dataset.ir); }; });
@@ -1683,7 +1828,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   function bindBarra() { $('g-back').onclick = function () { ir('menu'); }; $('g-exit').onclick = cerrar; }
   function cerrar() { marcar(false); auth.signOut().then(function () { history.replaceState(null, '', location.pathname); location.reload(); }); }
   function pintar(v) {
-    if (v === 'caja' || v === 'ventas' || v === 'pagar') abrirCaja(v);
+    if (v === 'caja' || v === 'ventas' || v === 'egresos' || v === 'pagar') abrirCaja(v);
     else if (v === 'usuarios' && esAdmin()) modUsuarios();
     else if (v === 'clave') { cambiarClave(false, function (m) { ir('menu', m); }); }
     else menu(arguments[1]);

@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 3.3
+  Flujo de Caja La Matriarca — versión 3.4
 
   HISTORIAL DE VERSIONES
+  v3.4 (5 oct 2026) — PDF más compacto.
+    · Se quitaron las líneas de firma y los espacios en blanco.
+    · Letra, filas y márgenes más ajustados: caben más proveedores por
+      hoja carta y el informe final ocupa menos hojas.
   v3.3 (5 oct 2026) — PDF: cada grupo empieza en su propia hoja.
     · Proveedores, Servicios, Personal y Gastos: cada grupo arranca en
       hoja nueva con su título y total arriba y su total general al
@@ -159,7 +163,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="3.3">
+<meta name="version" content="3.4">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -176,7 +180,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "3.3";
+window.MX_VERSION = "3.4";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1271,14 +1275,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var paq = 0;
     function nuevaHoja(cont, tituloH, esPaq) {
       P = d.add(); if (esPaq) paq++;
-      X.rect(P, ML, 34, CW, 3, VERDE);
-      X.text(P, ML, 54, 'LA MATRIARCA · TESORERÍA', { size: 8, bold: 1, color: MUT });
-      X.text(P, PW - ML, 54, esPaq ? 'PAQUETE ' + paq : semTxt, { size: 10, bold: 1, align: 'r', color: esPaq ? VERDE : [0, 0, 0] });
-      X.text(P, ML, 76, tituloH + (cont ? ' (continuación)' : ''), { size: 15, bold: 1 });
+      X.rect(P, ML, 28, CW, 2.5, VERDE);
+      X.text(P, ML, 44, 'LA MATRIARCA · TESORERÍA  ·  ' + tituloH + (cont ? ' (continuación)' : ''), { size: 9.5, bold: 1 });
+      X.text(P, PW - ML, 44, esPaq ? 'PAQUETE ' + paq : semTxt, { size: 10, bold: 1, align: 'r', color: esPaq ? VERDE : [0, 0, 0] });
       var meta = semTxt + '   ·   Autorizó: ' + (doc.por || '') + '   ·   Guardado: ' + stampLargo(doc.guardadoISO) + (doc.fechaPago ? '   ·   Pagos para el: ' + fnum(doc.fechaPago) : '');
-      X.text(P, ML, 91, meta, { size: 8, color: MUT });
-      X.line(P, ML, 99, PW - ML, 99, 0.8, [0.6, 0.6, 0.6]);
-      y = 112;
+      X.text(P, ML, 56, meta, { size: 7.5, color: MUT });
+      X.line(P, ML, 62, PW - ML, 62, 0.6, [0.6, 0.6, 0.6]);
+      y = 72;
     }
     var catKeys = Object.keys(CATN), grupos = [];
     catKeys.forEach(function (k) {
@@ -1295,24 +1298,25 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       C.forEach(function (c, i) { X.text(P, c.a === 'r' ? cx[i] + c.w - 6 : cx[i] + 6, y + 12, c.t, { size: 7.5, bold: 1, color: [1, 1, 1], align: c.a === 'r' ? 'r' : 'l' }); });
       y += 18;
     }
-    var hojas = [], LIM = PH - 112;
-    function firmas(Pg) { var sy = PH - 78; [['Autorizó', ML], ['Pagado el', ML + 190], ['Recibido (firma)', ML + 380]].forEach(function (f) { X.line(Pg, f[1], sy, f[1] + 152, sy, 0.8, [0.2, 0.2, 0.2]); X.text(Pg, f[1], sy + 11, f[0], { size: 8, color: MUT }); }); }
+    var hojas = [], LIM = PH - 46;
+    function firmas(Pg) { return; }
+    function firmasOld(Pg) { var sy = PH - 78; [['Autorizó', ML], ['Pagado el', ML + 190], ['Recibido (firma)', ML + 380]].forEach(function (f) { X.line(Pg, f[1], sy, f[1] + 152, sy, 0.8, [0.2, 0.2, 0.2]); X.text(Pg, f[1], sy + 11, f[0], { size: 8, color: MUT }); }); }
     function cabBloque(g, t, cont) {
-      X.rect(P, ML, y, 3, 17, VERDE);
-      var nm = t.name; while (X.tw(nm, 12, true) > CW - 150 && nm.length > 4) nm = nm.slice(0, -2);
+      X.rect(P, ML, y, 3, 14, VERDE);
+      var nm = t.name; while (X.tw(nm, 10.5, true) > CW - 170 && nm.length > 4) nm = nm.slice(0, -2);
       if (nm !== t.name) nm += '...';
-      X.text(P, ML + 9, y + 13, nm + (cont ? ' (continuación)' : ''), { size: 12, bold: 1 });
-      X.text(P, PW - ML, y + 12.5, g.name.toUpperCase() + '  ·  ' + t.items.length + (t.items.length === 1 ? ' factura' : ' facturas') + (t.nv ? '  ·  ' + t.nv + ' vencidas' : ''), { size: 7.5, bold: 1, color: MUT, align: 'r' });
-      y += 22;
-      X.rect(P, ML, y, CW, 15, VERDE);
-      C.forEach(function (c, i) { X.text(P, c.a === 'r' ? cx[i] + c.w - 6 : cx[i] + 6, y + 10.5, c.t, { size: 7, bold: 1, color: [1, 1, 1], align: c.a === 'r' ? 'r' : 'l' }); });
-      y += 15;
+      X.text(P, ML + 8, y + 11, nm + (cont ? ' (continuación)' : ''), { size: 10.5, bold: 1 });
+      X.text(P, PW - ML, y + 10.5, g.name.toUpperCase() + '  ·  ' + t.items.length + (t.items.length === 1 ? ' factura' : ' facturas') + (t.nv ? '  ·  ' + t.nv + ' vencidas' : ''), { size: 7, bold: 1, color: MUT, align: 'r' });
+      y += 16;
+      X.rect(P, ML, y, CW, 12, VERDE);
+      C.forEach(function (c, i) { X.text(P, c.a === 'r' ? cx[i] + c.w - 6 : cx[i] + 6, y + 8.5, c.t, { size: 6.5, bold: 1, color: [1, 1, 1], align: c.a === 'r' ? 'r' : 'l' }); });
+      y += 12;
     }
     function banda(g, cont) {
-      X.rect(P, ML, y, CW, 24, VERDE);
-      X.text(P, ML + 10, y + 16, g.name.toUpperCase() + (cont ? ' (continuación)' : ''), { size: 11, bold: 1, color: [1, 1, 1] });
-      X.text(P, PW - ML - 10, y + 15.5, g.lst.length + (g.lst.length === 1 ? ' tercero' : ' terceros') + '  ·  ' + g.n + (g.n === 1 ? ' factura' : ' facturas') + '  ·  ' + M(g.total), { size: 8.5, bold: 1, color: [1, 1, 1], align: 'r' });
-      y += 34;
+      X.rect(P, ML, y, CW, 20, VERDE);
+      X.text(P, ML + 10, y + 14, g.name.toUpperCase() + (cont ? ' (continuación)' : ''), { size: 10.5, bold: 1, color: [1, 1, 1] });
+      X.text(P, PW - ML - 10, y + 13.5, g.lst.length + (g.lst.length === 1 ? ' tercero' : ' terceros') + '  ·  ' + g.n + (g.n === 1 ? ' factura' : ' facturas') + '  ·  ' + M(g.total), { size: 8.5, bold: 1, color: [1, 1, 1], align: 'r' });
+      y += 26;
     }
     function paginaGrupo(g, cont) { nuevaHoja(false, 'Relación de pagos autorizados', true); hojas.push(P); firmas(P); banda(g, cont); }
     function altoBloque(t) { return t.rows.reduce(function (s, r) { return s + r.h; }, 0); }
@@ -1321,11 +1325,11 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       g.lst.forEach(function (t) {
         t.rows = t.items.map(function (x) {
           var ref = refDe(x), det = [x.cat === 'pers' ? '' : x.sub, x.factura && x.factura !== 'NO' && x.concepto ? x.concepto : ''].filter(Boolean).join(' · ');
-          var l1 = X.wrap(ref, C[1].w - 10, 9, true), l2 = X.wrap(det || '-', C[2].w - 10, 8.5, false);
-          return { x: x, l1: l1, l2: l2, h: Math.max(l1.length, l2.length, 1) * 11 + 8 };
+          var l1 = X.wrap(ref, C[1].w - 10, 8.5, true), l2 = X.wrap(det || '-', C[2].w - 10, 8, false);
+          return { x: x, l1: l1, l2: l2, h: Math.max(l1.length, l2.length, 1) * 10 + 6 };
         });
-        var cab = 22 + 15, tot = 36, total = cab + altoBloque(t) + tot + 14;
-        var base = 112 + 34;
+        var cab = 16 + 12, tot = 26, total = cab + altoBloque(t) + tot + 7;
+        var base = 72 + 26;
         if (y + total > LIM && y > base) {
           if (total <= LIM - base || y + cab + t.rows[0].h + tot > LIM) paginaGrupo(g, true);
         }
@@ -1335,65 +1339,63 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
           if (y + r.h + (last ? tot : 0) > LIM) { paginaGrupo(g, true); cabBloque(g, t, true); }
           var venc = x.dias != null && x.dias > 0;
           if (venc) X.rect(P, ML, y, CW, r.h, FROJO);
-          var by = y + 11;
-          X.text(P, cx[0] + 6, by, String(i + 1), { size: 8.5, color: MUT });
-          r.l1.forEach(function (s, j) { X.text(P, cx[1] + 6, by + j * 11, s, { size: 9, bold: 1 }); });
-          r.l2.forEach(function (s, j) { X.text(P, cx[2] + 6, by + j * 11, s, { size: 8.5, color: MUT }); });
-          X.text(P, cx[3] + 6, by, x.fDoc ? fnum(x.fDoc) : '-', { size: 8.5 });
-          X.text(P, cx[4] + 6, by, x.venc != null ? fnum(x.venc) : '-', { size: 8.5 });
-          X.text(P, cx[5] + 6, by, x.dias == null ? 'Sin venc.' : venc ? 'Vencida ' + x.dias + ' d' : x.dias === 0 ? 'Vence hoy' : 'Vence en ' + (-x.dias) + ' d', { size: 8.5, bold: venc, color: venc ? ROJO : [0, 0, 0] });
-          X.text(P, cx[6] + C[6].w - 6, by, M(x.saldo), { size: 9.5, bold: 1, align: 'r' });
+          var by = y + 9;
+          X.text(P, cx[0] + 6, by, String(i + 1), { size: 8, color: MUT });
+          r.l1.forEach(function (s, j) { X.text(P, cx[1] + 6, by + j * 10, s, { size: 8.5, bold: 1 }); });
+          r.l2.forEach(function (s, j) { X.text(P, cx[2] + 6, by + j * 10, s, { size: 8, color: MUT }); });
+          X.text(P, cx[3] + 6, by, x.fDoc ? fnum(x.fDoc) : '-', { size: 8 });
+          X.text(P, cx[4] + 6, by, x.venc != null ? fnum(x.venc) : '-', { size: 8 });
+          X.text(P, cx[5] + 6, by, x.dias == null ? 'Sin venc.' : venc ? 'Vencida ' + x.dias + ' d' : x.dias === 0 ? 'Vence hoy' : 'Vence en ' + (-x.dias) + ' d', { size: 8, bold: venc, color: venc ? ROJO : [0, 0, 0] });
+          X.text(P, cx[6] + C[6].w - 6, by, M(x.saldo), { size: 9, bold: 1, align: 'r' });
           y += r.h; X.line(P, ML, y, PW - ML, y, 0.5);
         });
         t.p2 = paq;
-        X.rect(P, ML, y + 4, CW, 24, GRIS); X.line(P, ML, y + 4, PW - ML, y + 4, 1.2, VERDE);
-        X.text(P, ML + 8, y + 20, 'TOTAL A PAGAR A ' + t.name.toUpperCase().slice(0, 44) + '  (' + t.items.length + (t.items.length === 1 ? ' factura)' : ' facturas)'), { size: 8.5, bold: 1 });
-        X.text(P, PW - ML - 8, y + 21, M(t.total), { size: 12, bold: 1, align: 'r' });
-        y += 28 + 14;
+        X.rect(P, ML, y + 3, CW, 20, GRIS); X.line(P, ML, y + 3, PW - ML, y + 3, 1, VERDE);
+        X.text(P, ML + 8, y + 16.5, 'TOTAL A PAGAR A ' + t.name.toUpperCase().slice(0, 44) + '  (' + t.items.length + (t.items.length === 1 ? ' factura)' : ' facturas)'), { size: 8, bold: 1 });
+        X.text(P, PW - ML - 8, y + 17, M(t.total), { size: 10.5, bold: 1, align: 'r' });
+        y += 23 + 7;
       });
-      if (y + 34 > LIM) paginaGrupo(g, true);
-      X.rect(P, ML, y, CW, 28, VERDE);
-      X.text(P, ML + 10, y + 18, 'TOTAL ' + g.name.toUpperCase() + '  ·  ' + g.n + (g.n === 1 ? ' factura' : ' facturas'), { size: 9.5, bold: 1, color: [1, 1, 1] });
-      X.text(P, PW - ML - 10, y + 19.5, M(g.total), { size: 13, bold: 1, color: [1, 1, 1], align: 'r' });
-      y += 34;
+      if (y + 26 > LIM) paginaGrupo(g, true);
+      X.rect(P, ML, y, CW, 22, VERDE);
+      X.text(P, ML + 10, y + 15, 'TOTAL ' + g.name.toUpperCase() + '  ·  ' + g.n + (g.n === 1 ? ' factura' : ' facturas'), { size: 9, bold: 1, color: [1, 1, 1] });
+      X.text(P, PW - ML - 10, y + 16, M(g.total), { size: 11.5, bold: 1, color: [1, 1, 1], align: 'r' });
+      y += 22;
     });
     // ---- informe final ----
     var R = [{ t: 'Proveedor / tercero', w: 236, a: 'l' }, { t: 'Paquete', w: 54, a: 'r' }, { t: 'Facturas', w: 56, a: 'r' }, { t: 'Vencidas', w: 56, a: 'r' }, { t: 'Total a pagar', w: 130, a: 'r' }];
     var rx = []; (function () { var x = ML; R.forEach(function (c, i) { rx[i] = x; x += c.w; }); })();
-        function rhead() { X.rect(P, ML, y, CW, 18, VERDE); R.forEach(function (c, i) { X.text(P, c.a === 'r' ? rx[i] + c.w - 8 : rx[i] + 8, y + 12, c.t, { size: 7.5, bold: 1, color: [1, 1, 1], align: c.a === 'r' ? 'r' : 'l' }); }); y += 18; }
+    function rhead() { X.rect(P, ML, y, CW, 13, VERDE); R.forEach(function (c, i) { X.text(P, c.a === 'r' ? rx[i] + c.w - 8 : rx[i] + 8, y + 9, c.t, { size: 6.5, bold: 1, color: [1, 1, 1], align: c.a === 'r' ? 'r' : 'l' }); }); y += 13; }
+    var RL = PH - 46;
     nuevaHoja(false, 'Informe final de pagos autorizados', false);
-    X.text(P, ML, y + 2, 'Resumen de lo que se paga a cada proveedor, por grupo', { size: 9.5, color: MUT }); y += 18;
     var totN = 0, totV = 0;
     grupos.forEach(function (g) {
-      if (y + 18 + 18 + 24 > PH - 90) nuevaHoja(true, 'Informe final de pagos autorizados', false);
-      X.rect(P, ML, y, CW, 20, GRIS); X.text(P, ML + 8, y + 14, g.name.toUpperCase(), { size: 9.5, bold: 1, color: VERDE });
-      X.text(P, PW - ML - 8, y + 14, g.lst.length + (g.lst.length === 1 ? ' tercero' : ' terceros') + ' · ' + g.n + (g.n === 1 ? ' factura' : ' facturas'), { size: 8, color: MUT, align: 'r' });
-      y += 24; rhead();
+      if (y + 20 + 13 + 18 + 22 > RL) nuevaHoja(true, 'Informe final de pagos autorizados', false);
+      X.rect(P, ML, y, CW, 17, GRIS); X.text(P, ML + 8, y + 12, g.name.toUpperCase(), { size: 9, bold: 1, color: VERDE });
+      X.text(P, PW - ML - 8, y + 11.5, g.lst.length + (g.lst.length === 1 ? ' tercero' : ' terceros') + ' · ' + g.n + (g.n === 1 ? ' factura' : ' facturas'), { size: 7.5, color: MUT, align: 'r' });
+      y += 19; rhead();
       g.lst.forEach(function (t) {
-        var ln = X.wrap(t.name, R[0].w - 16, 9, false), h = ln.length * 11 + 8;
-        if (y + h > PH - 100) { nuevaHoja(true, 'Informe final de pagos autorizados', false); X.text(P, ML, y, g.name.toUpperCase() + ' (continuación)', { size: 9, bold: 1, color: MUT }); y += 10; rhead(); }
+        var ln = X.wrap(t.name, R[0].w - 16, 8.5, false), h = ln.length * 10 + 5;
+        if (y + h + 22 > RL) { nuevaHoja(true, 'Informe final de pagos autorizados', false); X.text(P, ML, y + 8, g.name.toUpperCase() + ' (continuación)', { size: 8.5, bold: 1, color: MUT }); y += 12; rhead(); }
         if (t.nv) X.rect(P, ML, y, CW, h, FROJO);
-        ln.forEach(function (s, j) { X.text(P, rx[0] + 8, y + 12 + j * 11, s, { size: 9 }); });
-        X.text(P, rx[1] + R[1].w - 8, y + 12, t.p1 === t.p2 ? String(t.p1) : t.p1 + '-' + t.p2, { size: 9, color: MUT, align: 'r' });
-        X.text(P, rx[2] + R[2].w - 8, y + 12, String(t.items.length), { size: 9, align: 'r' });
-        X.text(P, rx[3] + R[3].w - 8, y + 12, t.nv ? String(t.nv) : '-', { size: 9, bold: !!t.nv, color: t.nv ? ROJO : MUT, align: 'r' });
-        X.text(P, rx[4] + R[4].w - 8, y + 12, M(t.total), { size: 9.5, bold: 1, align: 'r' });
+        ln.forEach(function (s2, j) { X.text(P, rx[0] + 8, y + 9.5 + j * 10, s2, { size: 8.5 }); });
+        X.text(P, rx[1] + R[1].w - 8, y + 9.5, t.p1 === t.p2 ? String(t.p1) : t.p1 + '-' + t.p2, { size: 8.5, color: MUT, align: 'r' });
+        X.text(P, rx[2] + R[2].w - 8, y + 9.5, String(t.items.length), { size: 8.5, align: 'r' });
+        X.text(P, rx[3] + R[3].w - 8, y + 9.5, t.nv ? String(t.nv) : '-', { size: 8.5, bold: !!t.nv, color: t.nv ? ROJO : MUT, align: 'r' });
+        X.text(P, rx[4] + R[4].w - 8, y + 9.5, M(t.total), { size: 9, bold: 1, align: 'r' });
         y += h; X.line(P, ML, y, PW - ML, y, 0.4);
         totN += t.items.length; totV += t.nv;
       });
-      X.line(P, ML, y + 4, PW - ML, y + 4, 1, VERDE);
-      X.text(P, ML + 8, y + 19, 'Subtotal ' + g.name.toLowerCase(), { size: 9, bold: 1 }); X.text(P, PW - ML - 8, y + 19, M(g.total), { size: 10.5, bold: 1, align: 'r' });
-      y += 36;
+      X.line(P, ML, y + 2, PW - ML, y + 2, 1, VERDE);
+      X.text(P, ML + 8, y + 15, 'Subtotal ' + g.name.toLowerCase(), { size: 8.5, bold: 1 }); X.text(P, PW - ML - 8, y + 15, M(g.total), { size: 10, bold: 1, align: 'r' });
+      y += 24;
     });
-    if (y + 70 + 70 > PH - 50) nuevaHoja(true, 'Informe final de pagos autorizados', false);
-    X.rect(P, ML, y, CW, 34, VERDE);
-    X.text(P, ML + 10, y + 21, 'TOTAL AUTORIZADO  ·  ' + doc.n + (doc.n === 1 ? ' factura' : ' facturas') + (totV ? '  ·  ' + totV + ' vencidas' : ''), { size: 9.5, bold: 1, color: [1, 1, 1] });
-    X.text(P, PW - ML - 10, y + 23, M(doc.total), { size: 15, bold: 1, color: [1, 1, 1], align: 'r' });
-    y += 34;
-    var sy2 = Math.max(y + 70, PH - 110);
-    [['Autorizó', ML], ['Recibido contabilidad', ML + 190], ['Fecha', ML + 380]].forEach(function (f) { X.line(P, f[1], sy2, f[1] + 152, sy2, 0.8, [0.2, 0.2, 0.2]); X.text(P, f[1], sy2 + 11, f[0], { size: 8, color: MUT }); });
+    if (y + 28 > RL) nuevaHoja(true, 'Informe final de pagos autorizados', false);
+    X.rect(P, ML, y, CW, 28, VERDE);
+    X.text(P, ML + 10, y + 18, 'TOTAL AUTORIZADO  ·  ' + doc.n + (doc.n === 1 ? ' factura' : ' facturas') + (totV ? '  ·  ' + totV + ' vencidas' : ''), { size: 9, bold: 1, color: [1, 1, 1] });
+    X.text(P, PW - ML - 10, y + 19.5, M(doc.total), { size: 13, bold: 1, color: [1, 1, 1], align: 'r' });
+    y += 28;
     // pie con número de hoja
-    d.pages.forEach(function (Pg, i) { X.text(Pg, PW / 2, PH - 26, 'Hoja ' + (i + 1) + ' de ' + d.pages.length + '   ·   La Matriarca · Tesorería   ·   Autorización semana ' + fnum(doc.lunes), { size: 7.5, color: MUT, align: 'c' }); });
+    d.pages.forEach(function (Pg, i) { X.text(Pg, PW / 2, PH - 24, 'Hoja ' + (i + 1) + ' de ' + d.pages.length + '   ·   La Matriarca · Tesorería   ·   Autorización semana ' + fnum(doc.lunes), { size: 7.5, color: MUT, align: 'c' }); });
     return X.bytes(d);
   }
   function pdfNombre(doc) { return 'Pagos-autorizados-' + iso(doc.lunes) + '.pdf'; }

@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 4.2
+  Flujo de Caja La Matriarca — versión 4.3
 
   HISTORIAL DE VERSIONES
+  v4.3 (5 oct 2026) — Disponible real: el encabezado dice "Informe para socios".
   v4.2 (5 oct 2026) — Leyenda en los pagos autorizados.
     · En Disponible real y en el informe guardado se aclara que la
       programación contempla lo ya vencido y lo próximo a vencer en la
@@ -209,7 +210,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="4.2">
+<meta name="version" content="4.3">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -226,7 +227,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "4.2";
+window.MX_VERSION = "4.3";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1571,7 +1572,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (R.real.row) bancos = '\x3cdetails class="dr-d">\x3csummary class="dr-r">\x3cspan>Saldo en Caja y Bancos \x3cem>▾ ver\x3c/em>\x3c/span>\x3cb>' + M(caja) + '\x3c/b>\x3c/summary>\x3cdiv class="dr-m dr-bk">' + W.realCols.map(function (c, i) { return R.real.row.v[i] ? '\x3cdiv>\x3csmall>' + esc(c.name) + '\x3c/small>\x3cb>' + M(R.real.row.v[i]) + '\x3c/b>\x3c/div>' : ''; }).join('') + '\x3c/div>\x3c/details>';
     else bancos = row('Saldo en Caja y Bancos', caja);
     var ik = Object.keys(im);
-    var h = '\x3csection class="dr" id="dr">\x3cdiv class="dr-h">\x3cdiv>\x3csmall>La Matriarca · Informe para Junta Directiva\x3c/small>\x3ch2>Disponible real de efectivo\x3c/h2>\x3c/div>\x3cdiv class="dr-f">\x3csmall>Fecha del informe\x3c/small>\x3cb>' + F(S.D, true) + '\x3c/b>\x3c/div>\x3c/div>';
+    var h = '\x3csection class="dr" id="dr">\x3cdiv class="dr-h">\x3cdiv>\x3csmall>La Matriarca · Informe para socios\x3c/small>\x3ch2>Disponible real de efectivo\x3c/h2>\x3c/div>\x3cdiv class="dr-f">\x3csmall>Fecha del informe\x3c/small>\x3cb>' + F(S.D, true) + '\x3c/b>\x3c/div>\x3c/div>';
     if (cargando) h += '\x3cdiv class="dr-w">Leyendo la autorización guardada…\x3c/div>';
     else if (!doc) h += '\x3cdiv class="dr-w">Sin autorización guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + ': no se descuenta ningún pago.\x3c/div>';
     h += '\x3cdiv class="dr-c">' + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') +

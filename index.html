@@ -1,8 +1,21 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 2.0
+  Flujo de Caja La Matriarca — versión 2.2
 
   HISTORIAL DE VERSIONES
+  v2.2 (5 oct 2026) — Último Excel subido.
+    · En la parte de arriba de cada módulo se muestra la fecha y hora en
+      que se subió el último Excel a la aplicación, quién lo subió y el
+      nombre del archivo.
+    · La hora se registra al guardar para todos.
+  v2.1 (5 oct 2026) — Programación de pagos.
+    · Nuevo módulo "Programación de pagos" en el menú: lo programado
+      para cada semana (lunes a domingo) según la fecha de programación
+      del Excel, igual que la hoja PROGRAMACION_PAGOS.
+    · Total programado por concepto, cuánto se ha pagado y cuánto falta.
+    · Detalle por tercero con sus facturas, valor a pagar, pagado y saldo.
+    · Muestra también lo atrasado de semanas anteriores y lo que aún
+      no tiene fecha de programación.
   v2.0 (3 oct 2026) — Restablecer contraseña.
     · Botón "Restablecer contraseña" en cada usuario de Administración
       de usuarios, con una contraseña sugerida que se puede cambiar.
@@ -74,7 +87,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="2.0">
+<meta name="version" content="2.2">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -91,7 +104,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "2.0";
+window.MX_VERSION = "2.2";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -351,6 +364,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .row-btn.on>span:first-child{color:var(--accent)}
 .row-btn.on{background:var(--accent-soft);margin:0 -8px;padding-left:8px;padding-right:8px;width:calc(100% + 16px);border-radius:8px}
 
+/* v2.1 · programación de pagos */
+.card.blk .parties.flat{border:0;border-radius:0;border-top:1px solid var(--line);background:none}
+.card.blk .card-f strong{font-size:22px}
+.party .refs{overflow-wrap:anywhere;color:var(--faint)}
+.pick .seg button[data-gdia]{text-transform:none}
+
+/* v2.2 · última actualización del Excel */
+.xl-upd{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:9px 14px;margin-bottom:12px}
+.xl-k{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;flex-basis:100%}
+.xl-upd b{font-size:16px;color:var(--ink)} .xl-upd b.xl-no{color:var(--warn)}
+.xl-n{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
 #gate{min-height:100vh;min-height:100dvh;background:var(--deep)}
@@ -451,7 +476,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   var pending = null; // {name} cuando se ve un Excel cargado sin guardar
   var M = MX.money, F = MX.fecha;
   var TABS = [['resumen', 'Resumen'], ['ventas', 'Ventas'], ['pagar', 'Por pagar'], ['cobrar', 'Por cobrar'], ['bancos', 'Bancos y cajas'], ['dia', 'Movimiento del día'], ['semanas', 'Semanas'], ['flujo', 'Próximos 14 días']];
-  var S = { tab: 'resumen', D: null, cat: 'all', est: 'pend', q: '', mCat: 'all', eMes: null, ePer: 'all', eDesde: null, eHasta: null, eCat: 'all', eEst: 'all', eVerTodo: false, pVista: 'pend', pCat: 'prov', pEst: 'all', pSem: null, vPunto: 'all', vVista: 'dia', vRango: 'mes', vIco: 'reg', recaudo: null, reserva: null, open: {} };
+  var S = { tab: 'resumen', D: null, cat: 'all', est: 'pend', q: '', mCat: 'all', eMes: null, ePer: 'all', eDesde: null, eHasta: null, eCat: 'all', eEst: 'all', eVerTodo: false, pVista: 'pend', pCat: 'prov', pEst: 'all', pSem: null, gSem: null, gDia: null, gVer: 'sem', gCat: 'all', gEst: 'all', vPunto: 'all', vVista: 'dia', vRango: 'mes', vIco: 'reg', recaudo: null, reserva: null, open: {} };
   try { var t = localStorage.getItem('mx-tab'); if (t && TABS.some(function (x) { return x[0] === t; })) S.tab = t; } catch (e) {}
   try { var h = location.hash.replace('#', ''); if (h && TABS.some(function (x) { return x[0] === h; })) S.tab = h; } catch (e) {}
   var artifactNS = null;
@@ -475,7 +500,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   var root = document.getElementById('app');
   var MODE = window.MX_MODE || 'caja';
   window.MX_SETMODE = function (m) { MODE = m; window.scrollTo(0, 0); render(); };
-  var SOLO = { ventas: 'Ventas e ingresos', egresos: 'Egresos y gastos', pagar: 'Cuentas por pagar' };
+  var SOLO = { ventas: 'Ventas e ingresos', egresos: 'Egresos y gastos', pagar: 'Cuentas por pagar', prog: 'Programación de pagos' };
   function tabsVisibles() { return SOLO[MODE] ? [] : (window.MX_NAV ? TABS.filter(function (t) { return !SOLO[t[0]]; }) : TABS); }
   function render() {
     if (SOLO[MODE]) S.tab = MODE;
@@ -489,22 +514,29 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       (window.MX_NAV ? '\x3cbutton class="nav-back" id="nav-back" aria-label="Volver al menú">‹\x3c/button>' : '') +
       '\x3cdiv class="brand">\x3csmall>La Matriarca · Tesorería' + (window.MX_VERSION ? ' · v' + window.MX_VERSION : '') + '\x3c/small>\x3cb>' + (SOLO[MODE] || 'Flujo de caja') + '\x3c/b>\x3c/div>' +
       (window.MX_NAV ? '\x3cbutton class="nav-exit" id="nav-exit">Salir\x3c/button>' : '') +
-      (MODE === 'egresos' ? '' : '\x3cdiv class="datebox" role="group" aria-label="Fecha de corte">\x3cbutton id="d-prev" aria-label="Día anterior">‹\x3c/button>\x3cinput type="date" id="d-in" value="' + iso(S.D) + '" min="' + iso(b.min) + '" max="' + iso(b.max + 30) + '" aria-label="Fecha de corte">\x3cbutton id="d-next" aria-label="Día siguiente">›\x3c/button>\x3c/div>') +
+      (MODE === 'egresos' || MODE === 'prog' ? '' : '\x3cdiv class="datebox" role="group" aria-label="Fecha de corte">\x3cbutton id="d-prev" aria-label="Día anterior">‹\x3c/button>\x3cinput type="date" id="d-in" value="' + iso(S.D) + '" min="' + iso(b.min) + '" max="' + iso(b.max + 30) + '" aria-label="Fecha de corte">\x3cbutton id="d-next" aria-label="Día siguiente">›\x3c/button>\x3c/div>') +
       (window.MX_ROLE === 'lector' || SOLO[MODE] ? '' : '\x3clabel class="btn pri" for="file-in">Cargar Excel\x3cspan class="hide-xs"> del día\x3c/span>\x3c/label>') + '\x3cinput type="file" id="file-in" accept=".xlsx,.xlsm,.xls" hidden>' +
       '\x3c/div>\x3c/div>' + (SOLO[MODE] ? '' : '\x3cdiv class="tabbar">\x3cnav class="wrap tabs" role="tablist">') + tabsVisibles().map(function (t) {
         var ct = t[0] === 'pagar' ? '\x3cspan class="ct">' + mm(R.pend.tAll) + '\x3c/span>' : t[0] === 'resumen' && A.filter(function (a) { return a.n === 'rojo'; }).length ? '\x3cspan class="ct">' + A.filter(function (a) { return a.n === 'rojo'; }).length + ' alertas\x3c/span>' : '';
         return '\x3cbutton role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + ct + '\x3c/button>';
       }).join('') + (SOLO[MODE] ? '' : '\x3c/nav>\x3c/div>') + '\x3c/header>';
-    html += '\x3cmain class="wrap fade">';
+    html += '\x3cmain class="wrap fade">' + xlsStrip();
     if (pending) html += '\x3cdiv class="banner">\x3cspan>Está viendo \x3cb>' + esc(pending.name) + '\x3c/b>, cargado ahora. ' + (artifactNS ? 'Guárdelo para que esta página lo muestre a todos.' : 'Solo usted lo ve en este dispositivo; para guardarlo para todos, ábralo con una cuenta con permiso de edición.') + '\x3c/span>\x3cspan style="display:flex;gap:8px">' + (artifactNS ? '\x3cbutton class="btn pri" id="save">Guardar para todos\x3c/button>' : '') + '\x3cbutton class="btn" id="discard">Volver a los datos guardados\x3c/button>\x3c/span>\x3c/div>';
     if (S.err) html += '\x3cdiv class="banner err">\x3cspan>' + esc(S.err) + '\x3c/span>\x3cbutton class="btn" id="err-x">Cerrar\x3c/button>\x3c/div>';
     if (S.tab !== 'resumen') html += '\x3cdiv class="meta">Datos del Excel “Tesorería Integrada” · fecha del informe en el archivo: ' + F(W.fechaInforme, true) + ' · control desde el ' + F(W.inicio, true) + ' · cargado ' + fmtStamp(W.cargado) + '\x3c/div>';
-    html += ({ egresos: vEgresos, ventas: vVentas, resumen: vResumen, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
+    html += ({ prog: vProg, egresos: vEgresos, ventas: vVentas, resumen: vResumen, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
     html += '\x3c/main>\x3cdiv id="tip" hidden>\x3c/div>';
     var sy = window.scrollY;
     root.innerHTML = html;
     window.scrollTo(0, sy);
     bind();
+  }
+  function stampLargo(s) { try { return new Date(s).toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); } catch (e) { return ''; } }
+  function xlsStrip() {
+    var sinG = pending ? '\x3cspan class="xl-n">Aún sin guardar para todos\x3c/span>' : '';
+    return '\x3cdiv class="xl-upd" role="status">\x3cspan class="xl-k">Último Excel subido\x3c/span>' +
+      (W.cargado ? '\x3cb>' + esc(stampLargo(W.cargado)) + '\x3c/b>' + (W.cargadoPor ? '\x3cspan class="xl-n">por ' + esc(W.cargadoPor) + '\x3c/span>' : '') + (W.archivoNombre ? '\x3cspan class="xl-n">' + esc(W.archivoNombre) + '\x3c/span>' : '') + sinG :
+        '\x3cb class="xl-no">Sin registrar\x3c/b>') + '\x3c/div>';
   }
   function fmtStamp(s) { try { var d = new Date(s); return d.toLocaleString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
 
@@ -870,6 +902,119 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       '\x3cp class="note">Cada factura va en la semana de su fecha de compra (lunes a domingo). “Pagado” suma los abonos que ya tienen fecha de pago en el Excel.\x3c/p>\x3c/section>';
     return h;
   }
+  /* ---------- PROGRAMACIÓN DE PAGOS (por fecha de programación, lunes a domingo) ---------- */
+  function vProg() {
+    var D = S.D, todos = MX.programados(W), hoyL = MX.lunesDe(D);
+    var conF = todos.filter(function (x) { return x.fProg != null; });
+    var sem = {}; conF.forEach(function (x) { var w = sem[x.semana] || (sem[x.semana] = { l: x.semana, tot: 0, sal: 0, n: 0 }); w.tot += x.valor; w.sal += x.saldo; w.n++; });
+    if (!sem[hoyL]) sem[hoyL] = { l: hoyL, tot: 0, sal: 0, n: 0 };
+    var sl = Object.keys(sem).map(function (k) { return sem[k]; }).sort(function (a, b) { return a.l - b.l; });
+    if (S.gSem == null || !sem[S.gSem]) S.gSem = hoyL;
+    var L = S.gSem, idx = sl.map(function (w) { return w.l; }).indexOf(L), W0 = sem[L];
+    var deSem = conF.filter(function (x) { return x.semana === L; });
+    var dias = {}; deSem.forEach(function (x) { var d = dias[x.fProg] || (dias[x.fProg] = { f: x.fProg, tot: 0, sal: 0, n: 0 }); d.tot += x.valor; d.sal += x.saldo; d.n++; });
+    var dl = Object.keys(dias).map(function (k) { return dias[k]; }).sort(function (a, b) { return a.f - b.f; });
+    if (S.gDia != null && !dias[S.gDia]) S.gDia = null;
+    var base = S.gDia == null ? deSem : deSem.filter(function (x) { return x.fProg === S.gDia; });
+    var atras = conF.filter(function (x) { return x.semana < L && Math.abs(x.saldo) > 0.5; });
+    var sinF = todos.filter(function (x) { return x.fProg == null && Math.abs(x.saldo) > 0.5; });
+    function suma(a, k) { return a.reduce(function (s, x) { return s + x[k]; }, 0); }
+    function nDocs(n) { return n + (n === 1 ? ' documento' : ' documentos'); }
+    var semLbl = 'Lun ' + F(L) + ' – dom ' + F(L + 6), perLbl = S.gDia == null ? semLbl : 'Programado para el ' + F(S.gDia, true).replace(/ \d{4}$/, '');
+    var cual = L === hoyL ? 'Semana actual' : L === hoyL - 7 ? 'Semana anterior' : L === hoyL + 7 ? 'Semana siguiente' : 'Semana';
+
+    var h = '\x3cdiv class="weeknav">\x3cbutton class="btn" id="g-prev"' + (idx <= 0 ? ' disabled' : '') + ' aria-label="Semana anterior">‹ Anterior\x3c/button>' +
+      '\x3cdiv class="weeknav-t">\x3csmall>' + cual + '\x3c/small>\x3cb>' + semLbl + '\x3c/b>\x3c/div>' +
+      '\x3cbutton class="btn" id="g-next"' + (idx >= sl.length - 1 ? ' disabled' : '') + ' aria-label="Semana siguiente">Siguiente ›\x3c/button>\x3c/div>';
+    if (dl.length) h += '\x3cdiv class="pick">\x3clabel>Fecha\x3c/label>\x3cdiv class="seg" role="group">\x3cbutton data-gdia="all" aria-pressed="' + (S.gDia == null) + '">Toda la semana\x3c/button>' +
+      dl.map(function (d) { return '\x3cbutton data-gdia="' + d.f + '" aria-pressed="' + (S.gDia === d.f) + '">' + F(d.f, true).replace(/ \d{4}$/, '') + '\x3c/button>'; }).join('') + '\x3c/div>\x3c/div>';
+
+    // Tarjetas: por concepto y estado
+    var T = {}, tot = 0, sal = 0, nPend = 0;
+    Object.keys(CATN).forEach(function (k) { T[k] = { v: 0, s: 0, ter: {} }; });
+    base.forEach(function (x) { var t = T[x.cat]; t.v += x.valor; t.s += x.saldo; t.ter[x.tercero.toLowerCase()] = 1; tot += x.valor; sal += x.saldo; if (x.estado === 'pend' || x.estado === 'abono') nPend++; });
+    var pct = tot > 0 ? Math.round(Math.max(0, Math.min(1, (tot - sal) / tot)) * 100) : 0;
+    h += '\x3csection class="cards2">' +
+      card({ icon: 'pagos', title: 'Programado por concepto', sub: esc(perLbl) + (base.length ? ' · toque un concepto para ver su detalle' : ''), cls: 'big',
+        body: base.length ? Object.keys(CATN).map(function (k) {
+          var t = T[k], nt = Object.keys(t.ter).length;
+          return '\x3cbutton class="row row-btn row-2" data-gcat="' + k + '">\x3cspan>' + CATN[k] + ' ›\x3csmall>' + (nt ? nt + (nt === 1 ? ' tercero' : ' terceros') + (t.s > 0.5 ? ' · falta ' + M(t.s) : ' · todo pagado') : 'Nada programado') + '\x3c/small>\x3c/span>' + amt(t.v) + '\x3c/button>';
+        }).join('') : '\x3cdiv class="empty">No hay pagos programados para esta semana.\x3c/div>',
+        totalLbl: 'Total programado', total: tot }) +
+      card({ icon: 'res', title: 'Cómo va la programación', sub: base.length ? pct + '% pagado' : 'Sin pagos programados',
+        body: '\x3cdiv class="bar-pct" role="img" aria-label="' + pct + '% pagado">\x3ci style="width:' + pct + '%">\x3c/i>\x3c/div>' + row('Total programado', tot) + row('Ya pagado', -(tot - sal)),
+        totalLbl: 'Falta por pagar' + (nPend ? ' · ' + nDocs(nPend) : ''), total: sal, tone: sal > 0.5 ? 'bad' : 'good' }) + '\x3c/section>';
+
+    // Por fecha de programación dentro de la semana
+    if (dl.length > 1) h += card({ icon: 'deuda', title: 'Por fecha de programación', sub: esc(semLbl) + ' · toque una fecha para ver solo ese día',
+      body: dl.map(function (d) { return '\x3cbutton class="row row-btn row-2' + (S.gDia === d.f ? ' on' : '') + '" data-gdia="' + d.f + '">\x3cspan>' + F(d.f, true).replace(/ \d{4}$/, '') + ' ›\x3csmall>' + nDocs(d.n) + (d.sal > 0.5 ? ' · falta ' + M(d.sal) : ' · todo pagado') + '\x3c/small>\x3c/span>' + amt(d.tot) + '\x3c/button>'; }).join(''),
+      totalLbl: 'Total de la semana', total: W0.tot });
+
+    // Lo que hay que pagar: semana + atrasado
+    var tAtr = suma(atras, 'saldo'), tSin = suma(sinF, 'saldo');
+    function porCat(a) { var o = { prov: 0, serv: 0, pers: 0, gast: 0 }; a.forEach(function (x) { o[x.cat] += x.saldo; }); return Object.keys(CATN).filter(function (k) { return Math.abs(o[k]) > 0.5; }).map(function (k) { return CATN[k] + ' ' + mm(o[k]); }).join(' · '); }
+    h += '\x3csection class="cards2">' +
+      card({ icon: 'sum', title: 'Lo que hay que pagar', sub: 'Programado y todavía sin pagar · toque para ver el detalle',
+        body: '\x3cbutton class="row row-btn row-2' + (S.gVer === 'sem' ? ' on' : '') + '" data-gver="sem">\x3cspan>Falta de esta semana ›\x3csmall>' + esc(semLbl) + '\x3c/small>\x3c/span>' + amt(W0.sal) + '\x3c/button>' +
+          '\x3cbutton class="row row-btn row-2' + (S.gVer === 'atr' ? ' on' : '') + '" data-gver="atr">\x3cspan>Atrasado de semanas anteriores ›\x3csmall>' + (atras.length ? nDocs(atras.length) + ' · ' + porCat(atras) : 'Nada atrasado') + '\x3c/small>\x3c/span>' + amt(tAtr) + '\x3c/button>',
+        totalLbl: 'Total programado sin pagar', total: W0.sal + tAtr, tone: W0.sal + tAtr > 0.5 ? 'bad' : 'good' }) +
+      card({ icon: 'imp', title: 'Sin programar todavía', sub: 'Facturas sin fecha de programación',
+        body: '\x3cbutton class="row row-btn row-2' + (S.gVer === 'sin' ? ' on' : '') + '" data-gver="sin">\x3cspan>Ver estas facturas ›\x3csmall>' + (sinF.length ? nDocs(sinF.length) + ' · ' + porCat(sinF) : 'Todo está programado') + '\x3c/small>\x3c/span>' + amt(tSin) + '\x3c/button>',
+        totalLbl: 'Total sin programar', total: tSin }) + '\x3c/section>';
+
+    // Detalle
+    var ver = S.gVer, fuente = ver === 'atr' ? atras : ver === 'sin' ? sinF : base;
+    var tit = ver === 'atr' ? 'Atrasado de semanas anteriores' : ver === 'sin' ? 'Sin fecha de programación' : 'Detalle de la programación';
+    var subt = ver === 'atr' ? 'Programado antes del ' + F(L) + ' y sin pagar' : ver === 'sin' ? 'Aún no tienen fecha de pago asignada' : perLbl;
+    h += '\x3csection class="sec" id="detalle">\x3cdiv class="sec-head">\x3ch2>' + tit + '\x3c/h2>\x3cspan class="meta">' + esc(subt) + '\x3c/span>\x3c/div>\x3cdiv class="filters">' +
+      seg('gVer', [['sem', S.gDia == null ? 'De la semana' : 'Del día'], ['atr', 'Atrasado'], ['sin', 'Sin programar']]) +
+      seg('gCat', [['all', 'Todo'], ['prov', 'Proveedores'], ['serv', 'Servicios'], ['pers', 'Personal'], ['gast', 'Gastos']]) +
+      (ver === 'sem' ? seg('gEst', [['all', 'Todos'], ['pend', 'Sin pagar'], ['pagada', 'Pagados']]) : '') +
+      '\x3cinput class="search" id="q" type="search" placeholder="Buscar tercero o factura…" value="' + esc(S.q) + '">\x3c/div>';
+    var q = S.q.toLowerCase();
+    var ff = fuente.filter(function (x) {
+      if (S.gCat !== 'all' && x.cat !== S.gCat) return false;
+      if (ver === 'sem' && S.gEst === 'pend' && !(x.estado === 'pend' || x.estado === 'abono')) return false;
+      if (ver === 'sem' && S.gEst === 'pagada' && x.estado !== 'pagada') return false;
+      if (q && (x.tercero + ' ' + x.factura + ' ' + x.concepto + ' ' + x.sub).toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    var campo = ver === 'sem' ? 'valor' : 'saldo';
+    var bloques = Object.keys(CATN).map(function (k) {
+      var its = ff.filter(function (x) { return x.cat === k; }); if (!its.length) return '';
+      var g = {}; its.forEach(function (x) { var kk = x.tercero.toLowerCase(); var t = g[kk] || (g[kk] = { name: x.tercero || '(sin nombre)', items: [], valor: 0, saldo: 0 }); t.items.push(x); t.valor += x.valor; t.saldo += x.saldo; });
+      var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return (b[campo] - a[campo]) || (b.valor - a.valor); });
+      var tv = suma(its, campo), ts = suma(its, 'saldo');
+      return '\x3carticle class="card blk">\x3cheader class="card-h">' + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') + '\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + nDocs(its.length) + '\x3c/small>\x3c/div>\x3c/header>' +
+        '\x3cdiv class="parties flat">' + gl.map(function (t) {
+          var key = 'g' + ver + (ver === 'sem' ? L + '.' + (S.gDia || '') : '') + '|' + k + '|' + t.name;
+          var refs = t.items.map(function (x) { return x.factura && x.factura !== 'NO' ? x.factura : x.concepto; }).filter(Boolean);
+          return '\x3cdetails class="party" data-k="' + esc(key) + '"' + (S.open[key] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot">' + M(t[campo]) + '\x3c/span>' +
+            '\x3cspan class="sub">' + (ver === 'sem' ? (t.saldo > 0.5 ? chip('rojo', t.valor - t.saldo > 0.5 ? 'Falta ' + M(t.saldo) : 'Sin pagar') : chip('verde', 'Pagado')) : '') + '\x3cspan>' + nDocs(t.items.length) + '\x3c/span>' + (refs.length ? '\x3cspan class="refs">' + esc(refs.slice(0, 4).join(', ')) + (refs.length > 4 ? '…' : '') + '\x3c/span>' : '') + '\x3c/span>\x3c/summary>' +
+            '\x3cdiv class="fxs">' + t.items.slice().sort(function (a, b) { return (a.fProg || 0) - (b.fProg || 0) || (a.fDoc || 0) - (b.fDoc || 0); }).map(function (x) {
+              var e = EST_F[x.estado];
+              var det = x.estado === 'pagada' ? (x.ultPago ? 'Pagada el ' + F(x.ultPago) + (x.banco ? ' · ' + esc(x.banco) : '') : 'Sin saldo') : x.estado === 'nc' ? (x.saldo < -0.5 ? 'Por aplicar' : 'Aplicada') :
+                (x.fProg ? (x.fProg < D ? 'Programada ' + F(x.fProg) + ' · ' + (D - x.fProg) + (D - x.fProg === 1 ? ' día de atraso' : ' días de atraso') : x.fProg === D ? 'Programada para hoy' : 'Programada ' + F(x.fProg)) : 'Sin programar');
+              var l1 = x.factura && x.factura !== 'NO' ? x.factura : (x.concepto || '—');
+              var l2 = [x.fDoc && (x.cat === 'prov' || x.cat === 'serv') ? 'Factura del ' + F(x.fDoc) : '', (x.cat === 'pers' ? '' : x.sub) || '', x.factura && x.factura !== 'NO' && x.concepto ? x.concepto : ''].filter(Boolean).join(' · ');
+              return '\x3cdiv class="fx">\x3cdiv class="fx-a">\x3cb>' + esc(l1) + '\x3c/b>\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3c/div>' +
+                '\x3cdiv class="fx-b">' + chip(e[0], e[1]) + '\x3cspan class="meta">' + det + '\x3c/span>\x3c/div>' +
+                '\x3cdiv class="fx-c">\x3cspan>\x3csmall>Valor a pagar\x3c/small>' + M(x.valor) + '\x3c/span>\x3cspan>\x3csmall>Pagado\x3c/small>' + M(x.pagado) + '\x3c/span>\x3cspan' + (x.saldo > 0.5 ? ' class="neg"' : '') + '>\x3csmall>Saldo\x3c/small>\x3cb>' + M(x.saldo) + '\x3c/b>\x3c/span>\x3c/div>\x3c/div>';
+            }).join('') + '\x3c/div>\x3c/details>';
+        }).join('') + '\x3c/div>' +
+        (ver === 'sem' && ts > 0.5 && Math.abs(ts - tv) > 0.5 ? '\x3cdiv class="card-x">\x3cdiv class="row">\x3cspan>Falta por pagar\x3c/span>' + amt(ts) + '\x3c/div>\x3c/div>' : '') +
+        '\x3cfooter class="card-f">\x3cspan>Total ' + CATN[k].toLowerCase() + (ver === 'sem' ? ' programado' : ' sin pagar') + '\x3c/span>\x3cstrong>' + M(tv) + '\x3c/strong>\x3c/footer>\x3c/article>';
+    }).filter(Boolean);
+    h += bloques.length ? bloques.join('') + '\x3cdiv class="sumline">\x3cspan>' + bloques.length + (bloques.length === 1 ? ' concepto' : ' conceptos') + ' · ' + nDocs(ff.length) + '\x3c/span>\x3cb>= ' + M(suma(ff, campo)) + '\x3c/b>\x3c/div>' :
+      '\x3cdiv class="panel empty">' + (ver === 'atr' ? 'No hay pagos atrasados de semanas anteriores.' : ver === 'sin' ? 'No hay facturas sin programar.' : 'No hay pagos programados con estos filtros.') + '\x3c/div>';
+    h += '\x3cp class="note">Cada pago va en la semana de su \x3cb>fecha de programación\x3c/b>, igual que la hoja PROGRAMACION_PAGOS del Excel. “Pagado” es el valor a pagar menos el saldo pendiente.\x3c/p>\x3c/section>';
+
+    // Todas las semanas
+    h += card({ icon: 'sum', title: 'Todas las semanas programadas', sub: 'Lunes a domingo · toque una semana para verla',
+      body: sl.slice().reverse().map(function (w) { return '\x3cbutton class="row row-btn row-2' + (w.l === L ? ' on' : '') + '" data-gsem="' + w.l + '">\x3cspan>' + F(w.l) + ' – ' + F(w.l + 6) + (w.l === hoyL ? ' (actual)' : '') + ' ›\x3csmall>' + (w.n ? nDocs(w.n) + (w.sal > 0.5 ? ' · falta ' + M(w.sal) : ' · todo pagado') : 'Nada programado') + '\x3c/small>\x3c/span>' + amt(w.tot) + '\x3c/button>'; }).join(''),
+      totalLbl: 'Total programado', total: suma(conF, 'valor') });
+    return h;
+  }
   /* ---------- EGRESOS Y GASTOS (causados: pagados y sin pagar) ---------- */
   var MESN = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
   function mesDe(f) { var d = MX.toJS(f); return d.getUTCFullYear() * 12 + d.getUTCMonth(); }
@@ -1151,6 +1296,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (eh) eh.onchange = function () { S.eHasta = eh.value ? fromIso(eh.value) : null; render(); };
     var et = document.getElementById('e-todo'); if (et) et.onclick = function () { S.eVerTodo = true; render(); };
     root.querySelectorAll('[data-sem]').forEach(function (b) { b.onclick = function () { S.pSem = +b.dataset.sem; window.scrollTo(0, 0); render(); }; });
+    root.querySelectorAll('[data-gsem]').forEach(function (b) { b.onclick = function () { S.gSem = +b.dataset.gsem; S.gDia = null; S.gVer = 'sem'; window.scrollTo(0, 0); render(); }; });
+    root.querySelectorAll('[data-gdia]').forEach(function (b) { b.onclick = function () { var v = b.dataset.gdia; S.gDia = v === 'all' || S.gDia === +v ? null : +v; S.gVer = 'sem'; render(); }; });
+    root.querySelectorAll('[data-gcat]').forEach(function (b) { b.onclick = function () { S.gCat = b.dataset.gcat; S.gVer = 'sem'; S.gEst = 'all'; S.q = ''; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
+    root.querySelectorAll('[data-gver]').forEach(function (b) { b.onclick = function () { S.gVer = b.dataset.gver; S.gCat = 'all'; S.gEst = b.dataset.gver === 'sem' ? 'pend' : 'all'; S.q = ''; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
+    var gp = document.getElementById('g-prev'); if (gp) gp.onclick = function () { S.gSem = progVecina(-1); S.gDia = null; S.gVer = 'sem'; render(); };
+    var gn = document.getElementById('g-next'); if (gn) gn.onclick = function () { S.gSem = progVecina(1); S.gDia = null; S.gVer = 'sem'; render(); };
     var wp = document.getElementById('w-prev'); if (wp) wp.onclick = function () { S.pSem = semVecina(1); render(); };
     var wn = document.getElementById('w-next'); if (wn) wn.onclick = function () { S.pSem = semVecina(-1); render(); };
     var din = document.getElementById('d-in');
@@ -1175,6 +1326,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     });
   }
   function semVecina(d) { var ws = {}; MX.facturas(W).forEach(function (x) { if (x.semana != null && (S.pCat === 'all' || x.cat === S.pCat)) ws[x.semana] = 1; }); var l = Object.keys(ws).map(Number).sort(function (a, b) { return b - a; }); var i = l.indexOf(S.pSem) + d; return l[Math.max(0, Math.min(l.length - 1, i))]; }
+  function progVecina(d) { var ws = {}; ws[MX.lunesDe(S.D)] = 1; W.pay.forEach(function (p) { if (p.fProg) ws[MX.lunesDe(p.fProg)] = 1; }); var l = Object.keys(ws).map(Number).sort(function (a, b) { return a - b; }); var i = l.indexOf(S.gSem) + d; return l[Math.max(0, Math.min(l.length - 1, i))]; }
   function MXnum(v) { var n = parseFloat(String(v).replace(/[^\d\-]/g, '')); return isFinite(n) ? n : null; }
   function go(t) { S.tab = t; try { if (t !== 'ventas' || !window.MX_NAV) localStorage.setItem('mx-tab', t); } catch (e) {} window.scrollTo(0, 0); render(); }
 
@@ -1192,6 +1344,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         var maxRow = function (s) { var ws = wb.Sheets[s]; if (!ws || !ws['!ref']) return 0; return XLSX.utils.decode_range(ws['!ref']).e.r + 1; };
         var nw = MX.parse(get, maxRow);
         if (!nw.accounts.length) throw new Error('No se encontraron las cuentas en la hoja BANCOS (A7:A16).');
+        nw.archivoNombre = file.name;
         W = nw; pending = { name: file.name }; S.err = null; S.D = W.fechaInforme || bounds().max; render();
       } catch (e) { S.err = e.message || 'No se pudo leer el archivo.'; render(); }
     };
@@ -1550,12 +1703,43 @@ var MX = (function () {
     return out;
   }
 
+  // Programación: cada documento según su fecha de programación (igual que la hoja PROGRAMACION_PAGOS)
+  function programados(W) {
+    var m = {}, out = [];
+    W.pay.forEach(function (p) {
+      var ref = (p.cat === 'prov' || p.cat === 'serv') ? p.factura : p.concepto;
+      var k = p.cat + '|' + p.tercero.toLowerCase() + '|' + String(ref).toLowerCase() + '|' + p.fProg + '|' + (p.cat === 'prov' || p.cat === 'serv' ? p.fDoc : '');
+      var x = m[k];
+      if (!x) { x = m[k] = { cat: p.cat, tercero: p.tercero, factura: p.factura, concepto: p.concepto, sub: p.sub, punto: p.punto, fDoc: p.fDoc, fProg: p.fProg || null, valor: 0, saldo: 0, ultPago: null, banco: '' }; out.push(x); }
+      x.valor += p.valor || 0; x.saldo += p.saldo || 0;
+      if (!x.sub && p.sub) x.sub = p.sub;
+      if (p.fPago && p.pagado && (x.ultPago == null || p.fPago > x.ultPago)) { x.ultPago = p.fPago; x.banco = p.banco || x.banco; }
+    });
+    out.forEach(function (x) {
+      x.pagado = x.valor - x.saldo;
+      x.estado = x.valor < -0.5 ? 'nc' : (x.saldo > 0.5 ? (x.pagado > 0.5 ? 'abono' : 'pend') : 'pagada');
+      x.semana = x.fProg ? lunesDe(x.fProg) : null;
+    });
+    return out;
+  }
+
+  // Fecha y hora en que se guardó por última vez el Excel (propiedades del archivo; si no hay, la del archivo en el equipo)
+  function fileMod(wb, file) {
+    var cand = [wb && wb.Props && wb.Props.ModifiedDate, file && file.lastModified];
+    for (var i = 0; i < cand.length; i++) {
+      if (!cand[i]) continue;
+      var d = new Date(cand[i]);
+      if (!isNaN(d.getTime()) && d.getFullYear() > 2000 && d.getTime() < Date.now() + 864e5) return d.toISOString();
+    }
+    return null;
+  }
+
   function money(v) { var n = Math.round(v); var s = Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.'); return (n < 0 ? '−$' : '$') + s; }
   var MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
   var DIA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
   function fecha(s, largo) { if (s == null) return '—'; var d = toJS(s); return (largo ? DIA[d.getUTCDay()] + ' ' : '') + d.getUTCDate() + ' ' + MES[d.getUTCMonth()] + (largo ? ' ' + d.getUTCFullYear() : ''); }
 
-  return { facturas: facturas, lunesDe: lunesDe, ventas: ventas, puntoIng: puntoIng, parse: parse, resumen: resumen, dia: dia, semanas: semanas, flujo14: flujo14, pendientes: pendientes, librosAt: librosAt, realAt: realAt, megaAt: megaAt, alertas: alertas, money: money, fecha: fecha, toJS: toJS, fromJS: fromJS, CATS: CATS, colIdx: colIdx, isICO: isICO };
+  return { fileMod: fileMod, programados: programados, facturas: facturas, lunesDe: lunesDe, ventas: ventas, puntoIng: puntoIng, parse: parse, resumen: resumen, dia: dia, semanas: semanas, flujo14: flujo14, pendientes: pendientes, librosAt: librosAt, realAt: realAt, megaAt: megaAt, alertas: alertas, money: money, fecha: fecha, toJS: toJS, fromJS: fromJS, CATS: CATS, colIdx: colIdx, isICO: isICO };
 })();
 if (typeof module !== 'undefined') module.exports = MX;
 </script>
@@ -1762,6 +1946,8 @@ if (typeof module !== 'undefined') module.exports = MX;
   /* ---------- Datos ---------- */
   window.MX_SAVE = function (W, archivo) {
     if (window.MX_ROLE === 'lector') return Promise.reject({ code: 'permission-denied' });
+    var quienSube = perfil && perfil.nombre ? perfil.nombre : (auth.currentUser ? auth.currentUser.email : '');
+    W.cargado = new Date().toISOString(); W.cargadoPor = quienSube; if (archivo) W.archivoNombre = archivo;
     var json = JSON.stringify(W);
     if (json.length > 900000) return Promise.reject({ message: 'El Excel es demasiado grande para guardarlo en un solo registro (' + Math.round(json.length / 1024) + ' KB).' });
     var u = auth.currentUser, now = new Date();
@@ -1781,7 +1967,7 @@ if (typeof module !== 'undefined') module.exports = MX;
           if (!wb.Sheets.BANCOS || !wb.Sheets.PROVEEDORES || !wb.Sheets.INGRESOS) throw new Error('Este archivo no tiene la estructura de Tesorería Integrada (faltan hojas BANCOS, PROVEEDORES o INGRESOS).');
           var get = function (s, a) { var ws = wb.Sheets[s]; if (!ws) return undefined; var c = ws[a]; return c ? c.v : undefined; };
           var maxRow = function (s) { var ws = wb.Sheets[s]; if (!ws || !ws['!ref']) return 0; return XLSX.utils.decode_range(ws['!ref']).e.r + 1; };
-          ok(MX.parse(get, maxRow));
+          var nw = MX.parse(get, maxRow); nw.archivoNombre = file.name; ok(nw);
         } catch (e) { bad(e); }
       };
       fr.onerror = function () { bad(new Error('No se pudo leer el archivo.')); };
@@ -1823,6 +2009,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   var ICO = {
     egresos: '\x3cpath d="M4 5v14M4 5h16"/>\x3cpath d="M8 9l3.5 4 3-2.5L19 16"/>\x3cpath d="M15 16h4v-4"/>',
     pagar: '\x3cpath d="M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21z"/>\x3cpath d="M10 8h4M10 12h4"/>',
+    prog: '\x3crect x="3.5" y="5" width="17" height="15" rx="2"/>\x3cpath d="M3.5 10h17M8 3v4M16 3v4"/>\x3cpath d="M8.5 15l2.2 2.2 4.3-4.4"/>',
     ventas: '\x3cpath d="M4 19V5M4 19h16"/>\x3cpath d="M8 15l3.5-4 3 2.5L19 8"/>\x3cpath d="M15 8h4v4"/>',
     caja: '\x3cpath d="M3 9.5 12 4l9 5.5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
     users: '\x3ccircle cx="9" cy="8" r="3.2"/>\x3cpath d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/>\x3cpath d="M16 5.2a3 3 0 0 1 0 5.6M18 13.8c1.8.6 3 2.3 3 4.7"/>',
@@ -1833,12 +2020,12 @@ if (typeof module !== 'undefined') module.exports = MX;
   function quien() { return perfil && perfil.nombre ? perfil.nombre : (auth.currentUser ? auth.currentUser.email : ''); }
   function menu(msg) {
     hideApp(); gate.hidden = false; gate.className = ''; window.scrollTo(0, 0);
-    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['ventas', 'Ventas e ingresos', 'Ventas por día y por punto, impoconsumo y otros ingresos'], ['egresos', 'Egresos y gastos', 'Todo lo causado por mes, semana o periodo, pagado y sin pagar'], ['pagar', 'Cuentas por pagar', 'Pendientes por proveedor y por semana, pagas y sin pagar']];
+    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['ventas', 'Ventas e ingresos', 'Ventas por día y por punto, impoconsumo y otros ingresos'], ['egresos', 'Egresos y gastos', 'Todo lo causado por mes, semana o periodo, pagado y sin pagar'], ['pagar', 'Cuentas por pagar', 'Pendientes por proveedor y por semana, pagas y sin pagar'], ['prog', 'Programación de pagos', 'Lo programado para pagar cada semana, con su detalle']];
     if (esAdmin()) items.push(['users', 'Administración de usuarios', 'Crear, editar y eliminar usuarios']);
     items.push(['salir', 'Salir', 'Cerrar sesión y volver al ingreso']);
     gate.innerHTML = '\x3cdiv class="scr">\x3cdiv class="scr-in">\x3cdiv class="m-hi">\x3csmall>Bienvenido\x3c/small>\x3cb>' + esc(quien()) + '\x3c/b>\x3cspan>' + esc(ROLES[window.MX_ROLE] || '') + '\x3c/span>\x3c/div>' +
       (msg ? '\x3cp class="g-ok">' + esc(msg) + '\x3c/p>' : '') +
-      '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + (/^(ventas|egresos|pagar)$/.test(it[0]) ? ' m-main' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
+      '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + (/^(ventas|egresos|pagar|prog)$/.test(it[0]) ? ' m-main' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
       (esAdmin() ? '' : '\x3cbutton class="g-link" type="button" data-ir="clave">Cambiar mi contraseña\x3c/button>') +
       '\x3cp class="g-ver">Versión ' + esc(window.MX_VERSION || '') + '\x3c/p>\x3c/div>\x3c/div>';
     gate.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { b.dataset.ir === 'salir' ? cerrar() : ir(b.dataset.ir); }; });
@@ -1847,7 +2034,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   function bindBarra() { $('g-back').onclick = function () { ir('menu'); }; $('g-exit').onclick = cerrar; }
   function cerrar() { marcar(false); auth.signOut().then(function () { history.replaceState(null, '', location.pathname); location.reload(); }); }
   function pintar(v) {
-    if (v === 'caja' || v === 'ventas' || v === 'egresos' || v === 'pagar') abrirCaja(v);
+    if (v === 'caja' || v === 'ventas' || v === 'egresos' || v === 'pagar' || v === 'prog') abrirCaja(v);
     else if (v === 'usuarios' && esAdmin()) modUsuarios();
     else if (v === 'clave') { cambiarClave(false, function (m) { ir('menu', m); }); }
     else menu(arguments[1]);

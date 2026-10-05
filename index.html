@@ -1,8 +1,13 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 3.5
+  Flujo de Caja La Matriarca — versión 3.6
 
   HISTORIAL DE VERSIONES
+  v3.6 (5 oct 2026) — PDF: el Personal siempre en hojas aparte.
+    · El grupo Personal empieza en hoja nueva y no se mezcla con los
+      otros grupos; lo que sigue (Gastos varios) también arranca aparte.
+    · Al final, una hoja con el consolidado de todo: cada proveedor de
+      cada grupo (incluido Personal) con su total.
   v3.5 (5 oct 2026) — PDF con el máximo aprovechamiento de la hoja.
     · Los grupos ya no empiezan en hoja nueva: siguen uno tras otro
       (cada uno con su banda y su total) y se llena toda la hoja.
@@ -170,7 +175,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="3.5">
+<meta name="version" content="3.6">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -187,7 +192,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "3.5";
+window.MX_VERSION = "3.6";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1310,7 +1315,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       X.rect(P, ML, y, CW, 19, VERDE);
       X.text(P, ML + 10, y + 13.5, g.name.toUpperCase() + (cont ? ' (continuación)' : ''), { size: 10, bold: 1, color: [1, 1, 1] });
       X.text(P, PW - ML - 10, y + 13, g.lst.length + (g.lst.length === 1 ? ' tercero' : ' terceros') + '  ·  ' + g.n + (g.n === 1 ? ' factura' : ' facturas') + '  ·  ' + M(g.total), { size: 8, bold: 1, color: [1, 1, 1], align: 'r' });
-      y += 19; thead();
+      y += 19; if (!g.compact) thead();
     }
     function cabProv(t, cont) {
       X.rect(P, ML, y, CW, 14, [0.86, 0.91, 0.88]); X.rect(P, ML, y, 3, 14, VERDE);
@@ -1325,14 +1330,31 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       var ref = refDe(x), det = [x.cat === 'pers' ? '' : x.sub, x.factura && x.factura !== 'NO' && x.concepto ? x.concepto : ''].filter(Boolean).join(' · ');
       var l1 = X.wrap(ref, C[1].w - 10, 8.5, true), l2 = X.wrap(det || '-', C[2].w - 10, 8, false);
       return { x: x, l1: l1, l2: l2, h: Math.max(l1.length, l2.length, 1) * 9.5 + 4 }; }); }); });
+    grupos.forEach(function (g) { g.compact = g.lst.every(function (t) { return t.items.length === 1; }); });
+    var prevPers = false;
     grupos.forEach(function (g, gi) {
       var t0 = g.lst[0], n0 = t0.rows.length, ini = 19 + 12 + 14 + t0.rows[0].h + (n0 > 1 ? t0.rows[1].h : 0) + (n0 <= 2 ? 15 + (g.lst.length === 1 ? 21 : 0) : 0);
+      if (g.compact) ini = 19 + 22 + (g.lst.length === 1 ? 21 : 0);
       if (!P) nuevaHoja(false, 'Relación de pagos autorizados', true), hojas.push(P);
-      else if (y + 6 + ini > LIM) nuevaHoja(false, 'Relación de pagos autorizados', true), hojas.push(P);
+      else if (g.k === 'pers' || prevPers || y + 6 + ini > LIM) nuevaHoja(false, 'Relación de pagos autorizados', true), hojas.push(P);
       else y += 6;
       banda(g, false);
       g.lst.forEach(function (t, ti) {
         var xtra = ti === g.lst.length - 1 ? 21 : 0;
+        if (g.compact) {
+          var r0 = t.rows[0], x0 = r0.x, v0 = x0.dias != null && x0.dias > 0;
+          if (y + 22 + xtra > LIM) hojaNueva(g, true);
+          t.p1 = t.p2 = paq;
+          if (v0) X.rect(P, ML, y, CW, 22, FROJO);
+          var nmc = t.name; while (X.tw(nmc, 8.5, true) > 250 && nmc.length > 4) nmc = nmc.slice(0, -2); if (nmc !== t.name) nmc += '...';
+          X.text(P, ML + 6, y + 9.5, nmc, { size: 8.5, bold: 1 });
+          X.text(P, cx[5] + 6, y + 9.5, x0.dias == null ? 'Sin venc.' : v0 ? 'Vencida ' + x0.dias + ' d' : x0.dias === 0 ? 'Vence hoy' : 'Vence en ' + (-x0.dias) + ' d', { size: 8, bold: v0, color: v0 ? ROJO : [0, 0, 0] });
+          X.text(P, PW - ML - 6, y + 9.5, M(x0.saldo), { size: 9, bold: 1, align: 'r' });
+          var det0 = [r0.l1.join(' '), x0.cat === 'pers' ? '' : x0.sub, x0.factura && x0.factura !== 'NO' && x0.concepto ? x0.concepto : '', x0.fDoc ? 'Factura ' + fnum(x0.fDoc) : '', x0.venc != null ? 'Vence ' + fnum(x0.venc) : ''].filter(Boolean).join('  ·  ');
+          X.text(P, ML + 6, y + 18.5, det0, { size: 7.5, color: MUT });
+          y += 22; X.line(P, ML, y, PW - ML, y, 0.4);
+          return;
+        }
         var nr = t.rows.length, need = 14 + t.rows[0].h + (nr > 1 ? t.rows[1].h : 0) + (nr <= 2 ? 15 + xtra : 0);
         if (y + need > LIM) hojaNueva(g, true);
         t.p1 = paq; cabProv(t, false);
@@ -1361,7 +1383,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       X.rect(P, ML, y, CW, 19, VERDE);
       X.text(P, ML + 10, y + 13, 'TOTAL ' + g.name.toUpperCase() + '  ·  ' + g.n + (g.n === 1 ? ' factura' : ' facturas'), { size: 9, bold: 1, color: [1, 1, 1] });
       X.text(P, PW - ML - 10, y + 14, M(g.total), { size: 11, bold: 1, color: [1, 1, 1], align: 'r' });
-      y += 19;
+      y += 19; prevPers = g.k === 'pers';
     });
     // ---- informe final ----
     var R = [{ t: 'Proveedor / tercero', w: 236, a: 'l' }, { t: 'Paquete', w: 54, a: 'r' }, { t: 'Facturas', w: 56, a: 'r' }, { t: 'Vencidas', w: 56, a: 'r' }, { t: 'Total a pagar', w: 130, a: 'r' }];
@@ -1400,6 +1422,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     d.pages.forEach(function (Pg, i) { X.text(Pg, PW / 2, PH - 24, 'Hoja ' + (i + 1) + ' de ' + d.pages.length + '   ·   La Matriarca · Tesorería   ·   Autorización semana ' + fnum(doc.lunes), { size: 7.5, color: MUT, align: 'c' }); });
     return X.bytes(d);
   }
+  window.MX_PDF = function (doc) { return pdfAut(doc); };
   function pdfNombre(doc) { return 'Pagos-autorizados-' + iso(doc.lunes) + '.pdf'; }
   function pdfEntregar(doc, ver) {
     var u8 = pdfAut(doc), blob = new Blob([u8], { type: 'application/pdf' }), nombre = pdfNombre(doc);

@@ -1,8 +1,15 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 3.9
+  Flujo de Caja La Matriarca — versión 4.0
 
   HISTORIAL DE VERSIONES
+  v4.0 (5 oct 2026) — Nuevo: Disponible real en efectivo.
+    · Opción nueva en el menú, con el informe del Excel hecho para el
+      celular: caja y bancos + MEGAMAS = total disponible.
+    · Descuenta SOLO los pagos autorizados y guardados de la semana
+      (proveedores, personal, servicios, gastos varios) y los impuestos.
+      No descuenta lo vencido ni lo programado que no se autorizó.
+    · Muestra al final las otras cuentas por cobrar (empleados, socios, otros).
   v3.9 (5 oct 2026) — Quitar facturas no pagadas de la programación.
     · En el informe guardado (solo administrador) cada factura, cada
       proveedor y cada grupo tienen su casilla con chulito (todas marcadas).
@@ -194,7 +201,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="3.9">
+<meta name="version" content="4.0">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -211,7 +218,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "3.9";
+window.MX_VERSION = "4.0";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -583,6 +590,21 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .ck-bar .btn:not(.pri){background:#fff;color:#173D30;border-color:#fff}
 .rep:has(.ck-bar){padding-bottom:110px}
 @media print{.rck{display:none!important}}
+/* v4.0 Disponible real */
+.dr-h{background:var(--ink);color:var(--surface);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.dr-h small{opacity:.7;letter-spacing:.06em;text-transform:uppercase;font-size:11.5px;font-weight:700}
+.dr-h h2{margin:4px 0 4px;font-size:22px}.dr-h p{margin:0 0 10px;font-size:13px;opacity:.8;font-style:italic}
+.dr-f{display:flex;justify-content:space-between;align-items:baseline;background:rgba(255,255,255,.1);border-radius:10px;padding:8px 12px}.dr-f b{font-size:18px}
+.dr-c{padding:0;overflow:hidden}
+.dr-r{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 16px;border-top:1px solid var(--line)}
+.dr-r span{display:flex;flex-direction:column;min-width:0}.dr-r small{color:var(--muted);font-size:12px}
+.dr-r b{white-space:nowrap;font-variant-numeric:tabular-nums}
+.dr-r.sm{padding:7px 16px 7px 28px;font-size:13.5px;color:var(--muted)}
+.dr-r.tot{background:var(--sunk);font-weight:800;border-top:2px solid var(--ink)}
+.dr-b{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 16px;font-weight:800;color:#fff;border-top:1px solid var(--line)}
+.dr-b b{font-size:19px;white-space:nowrap}
+.dr-b.ok{background:#245a3a}.dr-b.no{background:#9c2027}.dr-b.neg{background:#6d1015}
+.dr-d>summary{padding:8px 16px;font-size:13px;color:var(--muted);cursor:pointer;border-top:1px solid var(--line)}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -709,7 +731,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   var root = document.getElementById('app');
   var MODE = window.MX_MODE || 'caja';
   window.MX_SETMODE = function (m) { MODE = m; Object.keys(S.open).forEach(function (k) { if (/^(ba|ap|br|rp)\|/.test(k)) delete S.open[k]; }); window.scrollTo(0, 0); render(); };
-  var SOLO = { ventas: 'Ventas e ingresos', egresos: 'Egresos y gastos', pagar: 'Cuentas por pagar', prog: 'Programación de pagos', auth: 'Pagos autorizados' };
+  var SOLO = { ventas: 'Ventas e ingresos', egresos: 'Egresos y gastos', pagar: 'Cuentas por pagar', prog: 'Programación de pagos', auth: 'Pagos autorizados', disp: 'Disponible real en efectivo' };
   function tabsVisibles() { return SOLO[MODE] ? [] : (window.MX_NAV ? TABS.filter(function (t) { return !SOLO[t[0]]; }) : TABS); }
   function render() {
     if (SOLO[MODE]) S.tab = MODE;
@@ -733,7 +755,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (pending) html += '\x3cdiv class="banner">\x3cspan>Está viendo \x3cb>' + esc(pending.name) + '\x3c/b>, cargado ahora. ' + (artifactNS ? 'Guárdelo para que esta página lo muestre a todos.' : 'Solo usted lo ve en este dispositivo; para guardarlo para todos, ábralo con una cuenta con permiso de edición.') + '\x3c/span>\x3cspan style="display:flex;gap:8px">' + (artifactNS ? '\x3cbutton class="btn pri" id="save">Guardar para todos\x3c/button>' : '') + '\x3cbutton class="btn" id="discard">Volver a los datos guardados\x3c/button>\x3c/span>\x3c/div>';
     if (S.err) html += '\x3cdiv class="banner err">\x3cspan>' + esc(S.err) + '\x3c/span>\x3cbutton class="btn" id="err-x">Cerrar\x3c/button>\x3c/div>';
     if (S.tab !== 'resumen') html += '\x3cdiv class="meta">Datos del Excel “Tesorería Integrada” · fecha del informe en el archivo: ' + F(W.fechaInforme, true) + ' · control desde el ' + F(W.inicio, true) + ' · cargado ' + fmtStamp(W.cargado) + '\x3c/div>';
-    html += ({ auth: vAuth, prog: vProg, egresos: vEgresos, ventas: vVentas, resumen: vResumen, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
+    html += ({ auth: vAuth, prog: vProg, egresos: vEgresos, ventas: vVentas, resumen: vResumen, disp: vDisp, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
     html += '\x3c/main>\x3cdiv id="tip" hidden>\x3c/div>';
     var sy = window.scrollY;
     root.innerHTML = html;
@@ -1518,6 +1540,31 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     pdfBaja(blob, nombre);
   }
   function pdfBaja(blob, nombre) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(function () { document.body.removeChild(a); }, 500); }
+  function vDisp(R) {
+    var L = MX.lunesDe(authD()), id = iso(L); aLoad(L);
+    var doc = S.aDocs[id], cargando = doc === undefined, im = W.impuestos || {};
+    var caja = R.real.total, mega = R.mega.saldo, total = caja + mega;
+    var g = { prov: [0, 0], pers: [0, 0], serv: [0, 0], gast: [0, 0] };
+    if (doc) doc.items.forEach(function (x) { var a = g[x.cat]; if (a) { a[0] += x.saldo; a[1]++; } });
+    var aut = doc ? doc.total : 0, imp = R.imp, real = total - aut - imp, otras = R.otras;
+    function row(l, v, cls, sub) { return '\x3cdiv class="dr-r' + (cls ? ' ' + cls : '') + '">\x3cspan>' + esc(l) + (sub ? '\x3csmall>' + esc(sub) + '\x3c/small>' : '') + '\x3c/span>\x3cb>' + M(v) + '\x3c/b>\x3c/div>'; }
+    function band(l, v, cls) { return '\x3cdiv class="dr-b ' + cls + '">\x3cspan>' + esc(l) + '\x3c/span>\x3cb>' + M(v) + '\x3c/b>\x3c/div>'; }
+    var bancos = '';
+    if (R.real.row) bancos = '\x3cdetails class="dr-d">\x3csummary>Ver saldo por banco y caja\x3c/summary>' + W.realCols.map(function (c, i) { return R.real.row.v[i] ? row(c.name, R.real.row.v[i], 'sm') : ''; }).join('') + '\x3c/details>';
+    var h = '\x3csection class="dr">\x3cheader class="dr-h">\x3csmall>La Matriarca · Tesorería\x3c/small>\x3ch2>Disponible real de efectivo\x3c/h2>\x3cp>Informe para Junta Directiva — Efectivo disponible neto, descontando solo los pagos autorizados\x3c/p>\x3cdiv class="dr-f">\x3cspan>Fecha del informe\x3c/span>\x3cb>' + F(S.D, true) + '\x3c/b>\x3c/div>\x3c/header>';
+    if (cargando) h += '\x3cdiv class="panel empty">Leyendo la autorización guardada…\x3c/div>';
+    else if (!doc) h += '\x3cdiv class="banner">\x3cspan>No hay una autorización de pagos guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + '. Por eso no se descuenta ningún pago. Entre a “Pagos autorizados”, escoja las facturas y guarde.\x3c/span>\x3c/div>';
+    h += '\x3cdiv class="card dr-c">' + row('Saldo en Caja y Bancos (real, según extracto/app)', caja) + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') +
+      band('(–) Pagos autorizados', aut, 'no') +
+      row('Proveedores', g.prov[0], '', g.prov[1] + (g.prov[1] === 1 ? ' factura' : ' facturas')) + row('Personal', g.pers[0], '', g.pers[1] + (g.pers[1] === 1 ? ' pago' : ' pagos')) +
+      row('Servicios (arriendos, servicios públicos)', g.serv[0], '', g.serv[1] + (g.serv[1] === 1 ? ' factura' : ' facturas')) + row('Gastos varios', g.gast[0], '', g.gast[1] + (g.gast[1] === 1 ? ' pago' : ' pagos')) +
+      band('(–) Impuestos', imp, 'no') + (Object.keys(im).length ? Object.keys(im).map(function (k) { return row(k, im[k]); }).join('') : row('Sin impuestos provisionados', 0)) +
+      band('Disponible real', real, real < 0 ? 'neg' : 'ok') +
+      band('(+) Otras cuentas por cobrar', otras, 'ok') + row('Cuentas por cobrar — Empleados', R.cxc.emp) + row('Cuentas por cobrar — Socios', R.cxc.soc) + row('Cuentas por cobrar — Otros', R.cxc.otr) +
+      '\x3cdiv class="dr-r tot">\x3cspan>Disponible si se cobran las otras cuentas\x3c/span>\x3cb>' + M(real + otras) + '\x3c/b>\x3c/div>\x3c/div>';
+    if (doc) h += '\x3cp class="meta">Pagos autorizados: ' + doc.n + ' · semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + (doc.fechaPago ? ' · pagos para el ' + F(doc.fechaPago, true) : '') + ' · autorizó ' + esc(doc.por || '') + ' · guardado ' + esc(stampLargo(doc.guardadoISO)) + (doc.retirados && doc.retirados.length ? ' · ' + doc.retirados.length + ' retiradas' : '') + '. Lo vencido o programado que no se autorizó no se descuenta.\x3c/p>';
+    return h + '\x3c/section>';
+  }
   function vAuthRep(doc, liveMap, admin) {
     if (!doc) return '\x3cdiv class="panel empty">' + (admin ? 'Aún no ha guardado una autorización para esta semana. Entre a “Autorizar pagos”.' : 'El administrador todavía no ha autorizado pagos para esta semana.') + '\x3c/div>';
     var year = MX.toJS(doc.lunes).getUTCFullYear();
@@ -2727,6 +2774,7 @@ if (typeof module !== 'undefined') module.exports = MX;
     auth: '\x3cpath d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/>\x3cpath d="M8.8 12l2.3 2.3 4.2-4.4"/>',
     prog: '\x3crect x="3.5" y="5" width="17" height="15" rx="2"/>\x3cpath d="M3.5 10h17M8 3v4M16 3v4"/>\x3cpath d="M8.5 15l2.2 2.2 4.3-4.4"/>',
     ventas: '\x3cpath d="M4 19V5M4 19h16"/>\x3cpath d="M8 15l3.5-4 3 2.5L19 8"/>\x3cpath d="M15 8h4v4"/>',
+    disp: '\x3crect x="3" y="6" width="18" height="12" rx="2"/>\x3ccircle cx="12" cy="12" r="2.6"/>\x3cpath d="M6.5 9.5v5M17.5 9.5v5"/>',
     caja: '\x3cpath d="M3 9.5 12 4l9 5.5M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
     users: '\x3ccircle cx="9" cy="8" r="3.2"/>\x3cpath d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/>\x3cpath d="M16 5.2a3 3 0 0 1 0 5.6M18 13.8c1.8.6 3 2.3 3 4.7"/>',
     clave: '\x3crect x="4" y="10" width="16" height="10" rx="2"/>\x3cpath d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2.5"/>',
@@ -2736,12 +2784,12 @@ if (typeof module !== 'undefined') module.exports = MX;
   function quien() { return perfil && perfil.nombre ? perfil.nombre : (auth.currentUser ? auth.currentUser.email : ''); }
   function menu(msg) {
     hideApp(); gate.hidden = false; gate.className = ''; window.scrollTo(0, 0);
-    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['ventas', 'Ventas e ingresos', 'Ventas por día y por punto, impoconsumo y otros ingresos'], ['egresos', 'Egresos y gastos', 'Todo lo causado por mes, semana o periodo, pagado y sin pagar'], ['pagar', 'Cuentas por pagar', 'Pendientes por proveedor y por semana, pagas y sin pagar'], ['prog', 'Programación de pagos', 'Lo programado para pagar cada semana, con su detalle'], ['auth', 'Pagos autorizados', 'Autorice los pagos de la semana y genere el informe para imprimir']];
+    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['disp', 'Disponible real en efectivo', 'Lo que hay en bancos y caja menos los pagos autorizados'], ['ventas', 'Ventas e ingresos', 'Ventas por día y por punto, impoconsumo y otros ingresos'], ['egresos', 'Egresos y gastos', 'Todo lo causado por mes, semana o periodo, pagado y sin pagar'], ['pagar', 'Cuentas por pagar', 'Pendientes por proveedor y por semana, pagas y sin pagar'], ['prog', 'Programación de pagos', 'Lo programado para pagar cada semana, con su detalle'], ['auth', 'Pagos autorizados', 'Autorice los pagos de la semana y genere el informe para imprimir']];
     if (esAdmin()) items.push(['users', 'Administración de usuarios', 'Crear, editar y eliminar usuarios']);
     items.push(['salir', 'Salir', 'Cerrar sesión y volver al ingreso']);
     gate.innerHTML = '\x3cdiv class="scr">\x3cdiv class="scr-in">\x3cdiv class="m-hi">\x3csmall>Bienvenido\x3c/small>\x3cb>' + esc(quien()) + '\x3c/b>\x3cspan>' + esc(ROLES[window.MX_ROLE] || '') + '\x3c/span>\x3c/div>' +
       (msg ? '\x3cp class="g-ok">' + esc(msg) + '\x3c/p>' : '') +
-      '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + (/^(ventas|egresos|pagar|prog|auth)$/.test(it[0]) ? ' m-main' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
+      '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + (/^(disp|ventas|egresos|pagar|prog|auth)$/.test(it[0]) ? ' m-main' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
       (esAdmin() ? '' : '\x3cbutton class="g-link" type="button" data-ir="clave">Cambiar mi contraseña\x3c/button>') +
       '\x3cp class="g-ver">Versión ' + esc(window.MX_VERSION || '') + '\x3c/p>\x3c/div>\x3c/div>';
     gate.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { b.dataset.ir === 'salir' ? cerrar() : ir(b.dataset.ir); }; });
@@ -2750,7 +2798,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   function bindBarra() { $('g-back').onclick = function () { ir('menu'); }; $('g-exit').onclick = cerrar; }
   function cerrar() { marcar(false); auth.signOut().then(function () { history.replaceState(null, '', location.pathname); location.reload(); }); }
   function pintar(v) {
-    if (v === 'caja' || v === 'ventas' || v === 'egresos' || v === 'pagar' || v === 'prog' || v === 'auth') abrirCaja(v);
+    if (v === 'caja' || v === 'disp' || v === 'ventas' || v === 'egresos' || v === 'pagar' || v === 'prog' || v === 'auth') abrirCaja(v);
     else if (v === 'usuarios' && esAdmin()) modUsuarios();
     else if (v === 'clave') { cambiarClave(false, function (m) { ir('menu', m); }); }
     else menu(arguments[1]);

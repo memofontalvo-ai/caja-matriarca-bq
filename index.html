@@ -1,8 +1,15 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 2.3
+  Flujo de Caja La Matriarca — versión 2.4
 
   HISTORIAL DE VERSIONES
+  v2.4 (5 oct 2026) — Permiso "Contabilidad".
+    · Nuevo permiso para los usuarios de contabilidad: ven todos los
+      módulos y pueden subir el Excel, igual que el administrador.
+    · No pueden entrar a Administración de usuarios (crear, editar,
+      restablecer o eliminar usuarios): eso es solo del administrador.
+    · Solo consulta sigue sin poder subir el Excel.
+    · Requiere publicar de nuevo las reglas de Firestore (firestore.rules).
   v2.3 (5 oct 2026) — Programación de pagos más corta.
     · Cada concepto (Proveedores, Servicios, Personal, Gastos varios)
       sale cerrado con su título y su total arriba. Al tocarlo se abre
@@ -91,7 +98,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="2.3">
+<meta name="version" content="2.4">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -108,7 +115,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "2.3";
+window.MX_VERSION = "2.4";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1767,7 +1774,7 @@ if (typeof module !== 'undefined') module.exports = MX;
 <script>(function () {
   var ADMIN_EMAIL = 'memofontalvo@gmail.com';
   var DOMINIO = 'usuarios.caja-matriarca-bq.firebaseapp.com';
-  var ROLES = { admin: 'Administrador', editor: 'Puede cargar Excel', lector: 'Solo consulta' };
+  var ROLES = { admin: 'Administrador', editor: 'Puede cargar Excel', lector: 'Solo consulta', contable: 'Contabilidad' };
   var gate = document.getElementById('gate');
   var cfg = window.FIREBASE_CONFIG || {};
   function card(html) { return '\x3cdiv class="scr">\x3cdiv class="scr-in">\x3cdiv class="g-card">' + html + '\x3c/div>\x3cp class="g-ver">Versión ' + esc(window.MX_VERSION || '') + '\x3c/p>\x3c/div>\x3c/div>'; }
@@ -1799,6 +1806,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   var perfil = null; // {nombre, usuario, rol, activo, debeCambiar}
 
   function normUsuario(u) { return String(u || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '.'); }
+  function puedeSubir() { return window.MX_ROLE === 'admin' || window.MX_ROLE === 'editor' || window.MX_ROLE === 'contable'; }
   function esAdmin() { return (auth.currentUser && auth.currentUser.email === ADMIN_EMAIL) || (perfil && perfil.activo && perfil.rol === 'admin'); }
   function errTxt(er) {
     var c = (er && er.code) || '';
@@ -1861,7 +1869,7 @@ if (typeof module !== 'undefined') module.exports = MX;
       '\x3clabel for="n-nom">Nombre completo\x3c/label>\x3cinput id="n-nom" required placeholder="Ej.: Carlos Pérez">' +
       '\x3clabel for="n-usr">Usuario (con este entra)\x3c/label>\x3cinput id="n-usr" required autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Ej.: carlos">' +
       '\x3clabel for="n-pas">Contraseña inicial\x3c/label>\x3cinput id="n-pas" required minlength="6" autocomplete="off" placeholder="Mínimo 6 caracteres">' +
-      '\x3clabel for="n-rol">Permiso\x3c/label>\x3cselect id="n-rol">\x3coption value="editor">Puede cargar Excel\x3c/option>\x3coption value="lector">Solo consulta\x3c/option>\x3coption value="admin">Administrador\x3c/option>\x3c/select>' +
+      '\x3clabel for="n-rol">Permiso\x3c/label>\x3cselect id="n-rol">\x3coption value="editor">Puede cargar Excel\x3c/option>\x3coption value="lector">Solo consulta\x3c/option>\x3coption value="contable">Contabilidad\x3c/option>\x3coption value="admin">Administrador\x3c/option>\x3c/select>' +
       '\x3cp class="g-err" id="n-err">\x3c/p>\x3cbutton class="g-btn" type="submit">Crear usuario\x3c/button>' +
       '\x3cp class="g-hint">La persona entra con su usuario y esta contraseña, y la app le pide cambiarla la primera vez.\x3c/p>\x3c/form>' +
       '\x3cdiv class="g-box">\x3ch3>Usuarios creados\x3c/h3>\x3cdiv id="g-list">\x3cp class="g-msg">Cargando…\x3c/p>\x3c/div>\x3c/div>\x3c/div>';
@@ -1966,7 +1974,7 @@ if (typeof module !== 'undefined') module.exports = MX;
 
   /* ---------- Datos ---------- */
   window.MX_SAVE = function (W, archivo) {
-    if (window.MX_ROLE === 'lector') return Promise.reject({ code: 'permission-denied' });
+    if (!puedeSubir()) return Promise.reject({ code: 'permission-denied' });
     var quienSube = perfil && perfil.nombre ? perfil.nombre : (auth.currentUser ? auth.currentUser.email : '');
     W.cargado = new Date().toISOString(); W.cargadoPor = quienSube; if (archivo) W.archivoNombre = archivo;
     var json = JSON.stringify(W);
@@ -1996,7 +2004,7 @@ if (typeof module !== 'undefined') module.exports = MX;
     });
   }
   function primerExcel(err) {
-    if (window.MX_ROLE === 'lector') { show('\x3cp class="g-msg">Todavía no hay datos cargados. Cuando el administrador cargue el Excel podrá verlos aquí.\x3c/p>\x3cbutton class="g-link" type="button" id="g-home">‹ Volver al menú\x3c/button>'); $('g-home').onclick = function () { ir('menu'); }; return; }
+    if (!puedeSubir()) { show('\x3cp class="g-msg">Todavía no hay datos cargados. Cuando el administrador cargue el Excel podrá verlos aquí.\x3c/p>\x3cbutton class="g-link" type="button" id="g-home">‹ Volver al menú\x3c/button>'); $('g-home').onclick = function () { ir('menu'); }; return; }
     show('\x3cp class="g-msg">Todavía no hay datos guardados. Cargue el Excel de Tesorería Integrada para empezar.\x3c/p>' + (err ? '\x3cp class="g-err">' + esc(err) + '\x3c/p>' : '') +
       '\x3clabel class="g-btn" for="g-file">Cargar Excel\x3c/label>\x3cinput id="g-file" type="file" accept=".xlsx,.xlsm,.xls" hidden>\x3cbutton class="g-link" type="button" id="g-home">‹ Volver al menú\x3c/button>');
     $('g-home').onclick = function () { ir('menu'); };

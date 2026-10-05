@@ -1,8 +1,15 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 2.9
+  Flujo de Caja La Matriarca — versión 3.0
 
   HISTORIAL DE VERSIONES
+  v3.0 (5 oct 2026) — Informe de pagos autorizados ordenado.
+    · El informe guardado sale por grupos (Proveedores, Servicios,
+      Personal, Gastos) con el total arriba; dentro, cada proveedor con
+      su subtotal y sus facturas (número, fechas, vencida en rojo).
+    · Cada grupo y cada proveedor se abre y se recoge; hay "Abrir todos"
+      y "Cerrar todos". Al imprimir sale todo abierto.
+    · El texto para compartir también va agrupado por proveedor.
   v2.9 (5 oct 2026) — Marcar por rango de vencimiento.
     · En Pagos autorizados hay botones: Solo vencidas, Vencidas + hoy,
       Hasta 3, 5, 7 o 15 días, y una fecha límite. Cada botón dice cuántas
@@ -134,7 +141,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="2.9">
+<meta name="version" content="3.0">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -151,7 +158,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "2.9";
+window.MX_VERSION = "3.0";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -499,6 +506,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .rng-o{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:12px}
 .rng-o small{color:var(--muted);font-weight:500}
 .rng-o.on{background:var(--accent-soft);border-color:var(--accent)}
+
+/* v3.0 informe agrupado */
+.rep-c .parties.flat{padding:0}
+.rep .rp-row.venc{border-left:5px solid #c0392b;background:#fdecea}
+.rep .party>summary{padding:12px 14px}
+.rep-c>.rp-sub{border-top:2px solid var(--line)}
+@media print{
+  .rep details>summary .chev{display:none}
+  .rep .card.blk{break-inside:auto;box-shadow:none}
+  .rep .party{break-inside:avoid}
+  .rep .rp-row.venc{background:#fdecea!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1063,9 +1082,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var L = ['AUTORIZACIÓN DE PAGOS · La Matriarca', 'Semana: ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + MX.toJS(doc.lunes).getUTCFullYear(), doc.fechaPago ? 'Pagos para el ' + F(doc.fechaPago, true) : '', 'Autorizó: ' + (doc.por || '') + ' · ' + stampLargo(doc.guardadoISO), ''].filter(function (s, i) { return s !== '' || i === 4; });
     Object.keys(CATN).forEach(function (k) {
       var its = doc.items.filter(function (x) { return x.cat === k; }); if (!its.length) return;
-      L.push(CATN[k].toUpperCase());
-      its.forEach(function (x) { L.push('• ' + x.tercero + ' · ' + refDe(x) + (x.dias != null && x.dias > 0 ? ' · vencida ' + x.dias + ' d' : '') + ' · ' + M(x.saldo)); });
-      L.push('Subtotal ' + CATN[k].toLowerCase() + ': ' + M(its.reduce(function (s, x) { return s + x.saldo; }, 0)), '');
+      L.push('== ' + CATN[k].toUpperCase() + ' ==');
+      var g = {}, ord = []; its.forEach(function (x) { var kk = (x.tercero || '').toLowerCase(); if (!g[kk]) { g[kk] = { name: x.tercero || '(sin nombre)', items: [] }; ord.push(kk); } g[kk].items.push(x); });
+      ord.forEach(function (kk) { var t = g[kk];
+        L.push(t.name + ' — ' + M(t.items.reduce(function (s2, x) { return s2 + x.saldo; }, 0)));
+        t.items.forEach(function (x) { L.push('   · ' + refDe(x) + (x.venc != null ? ' · vence ' + F(x.venc) : '') + (x.dias != null && x.dias > 0 ? ' · VENCIDA ' + x.dias + ' d' : '') + ' · ' + M(x.saldo)); });
+      });
+      L.push('Subtotal ' + CATN[k].toLowerCase() + ': ' + M(its.reduce(function (s2, x) { return s2 + x.saldo; }, 0)), '');
     });
     L.push('TOTAL AUTORIZADO: ' + M(doc.total) + ' (' + doc.n + (doc.n === 1 ? ' pago' : ' pagos') + ')');
     return L.join('\n');
@@ -1179,19 +1202,32 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       (doc.fechaPago ? '\x3cspan>\x3csmall>Pagos para el\x3c/small>\x3cb>' + F(doc.fechaPago, true) + '\x3c/b>\x3c/span>' : '') +
       '\x3cspan>\x3csmall>Autorizó\x3c/small>\x3cb>' + esc(doc.por || '') + '\x3c/b>\x3c/span>\x3cspan>\x3csmall>Guardado\x3c/small>\x3cb>' + esc(stampLargo(doc.guardadoISO)) + '\x3c/b>\x3c/span>' +
       '\x3cspan>\x3csmall>Pagos\x3c/small>\x3cb>' + doc.n + '\x3c/b>\x3c/span>\x3cspan>\x3csmall>Total\x3c/small>\x3cb>' + M(doc.total) + '\x3c/b>\x3c/span>\x3c/div>\x3c/header>';
-    var pagadas = 0, pagadasT = 0;
+    var pagadas = 0, pagadasT = 0, RK = [];
+    function sm(a) { return a.reduce(function (t, x) { return t + x.saldo; }, 0); }
+    h += '\x3cdiv class="ck-tools no-print" style="margin:6px 0">\x3cspan class="meta">Toque un grupo o un proveedor para abrirlo o recogerlo\x3c/span>\x3cspan>\x3cbutton class="btn" data-ropen="1">Abrir todos\x3c/button> \x3cbutton class="btn" data-ropen="0">Cerrar todos\x3c/button>\x3c/span>\x3c/div>';
     Object.keys(CATN).forEach(function (k) {
       var its = doc.items.filter(function (x) { return x.cat === k; }); if (!its.length) return;
-      its.sort(function (a, b) { return (b.dias == null ? -9999 : b.dias) - (a.dias == null ? -9999 : a.dias); });
-      h += '\x3carticle class="card rep-c">\x3cheader class="card-h">\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + its.length + (its.length === 1 ? ' pago' : ' pagos') + '\x3c/small>\x3c/div>\x3c/header>\x3cdiv class="rp-list">' + its.map(function (x) {
-        var lv = liveMap[x.k], pagadaEx = !lv;
-        if (pagadaEx) { pagadas++; pagadasT += x.saldo; }
-        var chipA = x.dias == null ? chip('neutro', 'Sin vencimiento') : x.dias > 0 ? chip('rojo', 'Vencida ' + x.dias + (x.dias === 1 ? ' día' : ' días')) : chip('neutro', x.dias === 0 ? 'Vence hoy' : 'Vence en ' + (-x.dias) + ' d');
-        var chipE = pagadaEx ? chip('verde', 'Ya no está pendiente en el Excel') : chip('amarillo', 'Pendiente en el Excel');
-        var l2 = [x.fDoc ? 'Factura ' + F(x.fDoc) : '', x.venc != null ? 'Vence ' + F(x.venc) : '', x.fProg ? 'Programada ' + F(x.fProg) : 'Sin programar'].filter(Boolean).join(' · ');
-        return '\x3cdiv class="rp-row">\x3cdiv class="rp-a">\x3cb>' + esc(x.tercero) + '\x3c/b>\x3cspan class="meta">' + esc(refDe(x)) + (x.sub && x.cat !== 'pers' ? ' · ' + esc(x.sub) : '') + '\x3c/span>\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3cspan class="rp-chips">' + chipA + ' \x3cspan class="no-print">' + chipE + '\x3c/span>\x3c/span>\x3c/div>\x3cdiv class="rp-v">' + M(x.saldo) + '\x3c/div>\x3c/div>';
-      }).join('') + '\x3c/div>\x3cdiv class="rp-sub">\x3cspan>Subtotal ' + CATN[k].toLowerCase() + '\x3c/span>\x3cb>' + M(its.reduce(function (s, x) { return s + x.saldo; }, 0)) + '\x3c/b>\x3c/div>\x3c/article>';
+      var g = {}; its.forEach(function (x) { var kk = (x.tercero || '').toLowerCase(); var t = g[kk] || (g[kk] = { name: x.tercero || '(sin nombre)', items: [] }); t.items.push(x); });
+      var gl = Object.keys(g).map(function (kk) { var t = g[kk]; t.items.sort(function (p1, q1) { return (q1.dias == null ? -9999 : q1.dias) - (p1.dias == null ? -9999 : p1.dias); }); t.max = t.items[0].dias == null ? -9999 : t.items[0].dias; t.saldo = sm(t.items); return t; }).sort(function (p1, q1) { return (q1.max - p1.max) || (q1.saldo - p1.saldo); });
+      var bkey = 'br|' + k, nVc = its.filter(function (x) { return x.dias != null && x.dias > 0; }).length;
+      RK.push(bkey);
+      h += '\x3cdetails class="card blk rep-c" data-bk="' + esc(bkey) + '"' + (S.open[bkey] !== false ? ' open' : '') + '>\x3csummary class="blk-s">' + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') +
+        '\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + its.length + (its.length === 1 ? ' pago' : ' pagos') + (nVc ? ' · \x3cspan class="neg">' + nVc + ' vencidas\x3c/span>' : '') + '\x3c/small>\x3c/div>' +
+        '\x3cdiv class="blk-t">\x3csmall>Total autorizado\x3c/small>\x3cstrong>' + M(sm(its)) + '\x3c/strong>\x3c/div>\x3cspan class="chev" aria-hidden="true">›\x3c/span>\x3c/summary>\x3cdiv class="parties flat">' +
+        gl.map(function (t) {
+          var key = 'rp|' + k + '|' + t.name, nv = t.items.filter(function (x) { return x.dias != null && x.dias > 0; }).length; RK.push(key);
+          return '\x3cdetails class="party' + (nv ? ' pv' : '') + '" data-k="' + esc(key) + '"' + (S.open[key] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot">' + M(t.saldo) + '\x3c/span>\x3cspan class="sub">' + (nv ? chip('rojo', nv + (nv === 1 ? ' vencida' : ' vencidas')) : chip('verde', 'Al día')) + '\x3cspan>' + t.items.length + (t.items.length === 1 ? ' factura' : ' facturas') + '\x3c/span>\x3c/span>\x3c/summary>' +
+            '\x3cdiv class="rp-list">' + t.items.map(function (x) {
+              var lv = liveMap[x.k], pagadaEx = !lv;
+              if (pagadaEx) { pagadas++; pagadasT += x.saldo; }
+              var chipA = x.dias == null ? chip('neutro', 'Sin vencimiento') : x.dias > 0 ? chip('rojo', 'VENCIDA ' + x.dias + (x.dias === 1 ? ' día' : ' días')) : chip('neutro', x.dias === 0 ? 'Vence hoy' : 'Vence en ' + (-x.dias) + ' d');
+              var chipE = pagadaEx ? chip('verde', 'Ya no está pendiente en el Excel') : chip('amarillo', 'Pendiente en el Excel');
+              var l2 = [x.fDoc ? 'Factura ' + F(x.fDoc) : '', x.venc != null ? 'Vence ' + F(x.venc) : '', x.fProg ? 'Programada ' + F(x.fProg) : 'Sin programar'].filter(Boolean).join(' · ');
+              return '\x3cdiv class="rp-row' + (x.dias != null && x.dias > 0 ? ' venc' : '') + '">\x3cdiv class="rp-a">\x3cb>' + esc(refDe(x)) + '\x3c/b>\x3cspan class="meta">' + CATN[x.cat] + (x.sub && x.cat !== 'pers' ? ' · ' + esc(x.sub) : '') + '\x3c/span>\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3cspan class="rp-chips">' + chipA + ' \x3cspan class="no-print">' + chipE + '\x3c/span>\x3c/span>\x3c/div>\x3cdiv class="rp-v">' + M(x.saldo) + '\x3c/div>\x3c/div>';
+            }).join('') + '\x3c/div>\x3cdiv class="rp-sub">\x3cspan>Subtotal ' + esc(t.name) + '\x3c/span>\x3cb>' + M(t.saldo) + '\x3c/b>\x3c/div>\x3c/details>';
+        }).join('') + '\x3c/div>\x3cdiv class="rp-sub">\x3cspan>Total ' + CATN[k].toLowerCase() + '\x3c/span>\x3cb>' + M(sm(its)) + '\x3c/b>\x3c/div>\x3c/details>';
     });
+    S._rk = RK;
     h += '\x3cdiv class="rep-tot">\x3cspan>Total autorizado\x3c/span>\x3cstrong>' + M(doc.total) + '\x3c/strong>\x3c/div>';
     if (pagadas) h += '\x3cp class="note no-print">' + pagadas + (pagadas === 1 ? ' pago autorizado ya no aparece' : ' pagos autorizados ya no aparecen') + ' como pendiente en el último Excel (' + M(pagadasT) + '): lo más probable es que ya se pagaron.\x3c/p>';
     h += '\x3cdiv class="rep-sign">\x3cdiv>Autorizó\x3c/div>\x3cdiv>Recibido contabilidad\x3c/div>\x3c/div>';
@@ -1578,6 +1614,9 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     return s + '\x3c/svg>';
   }
 
+  var _prevOpen = null;
+  window.addEventListener('beforeprint', function () { var r = document.getElementById('rep-auth'); if (!r) return; _prevOpen = []; r.querySelectorAll('details').forEach(function (d) { _prevOpen.push([d, d.open]); d.open = true; }); });
+  window.addEventListener('afterprint', function () { if (_prevOpen) _prevOpen.forEach(function (p) { p[0].open = p[1]; }); _prevOpen = null; });
   /* ---------- Eventos ---------- */
   function bind() {
     root.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { go(b.dataset.tab); }; });
@@ -1613,6 +1652,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var apv = document.getElementById('a-prev'); if (apv) apv.onclick = function () { S.aWeek -= 7; S.aInit = null; render(); };
     var anx = document.getElementById('a-next'); if (anx) anx.onclick = function () { S.aWeek += 7; S.aInit = null; render(); };
     var asv = document.getElementById('a-save'); if (asv) asv.onclick = autGuardar;
+    root.querySelectorAll('[data-ropen]').forEach(function (b) { b.onclick = function () { var v = b.dataset.ropen === '1'; (S._rk || []).forEach(function (k) { S.open[k] = v; }); render(); }; });
     var apr = root.querySelector('[data-aprint]'); if (apr) apr.onclick = function () { window.print(); };
     var ash = root.querySelector('[data-ashare]'); if (ash) ash.onclick = function () {
       var doc = S.aDocs[iso(S.aWeek)], txt = textoAut(doc);

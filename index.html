@@ -1,8 +1,14 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 2.8
+  Flujo de Caja La Matriarca — versión 2.9
 
   HISTORIAL DE VERSIONES
+  v2.9 (5 oct 2026) — Marcar por rango de vencimiento.
+    · En Pagos autorizados hay botones: Solo vencidas, Vencidas + hoy,
+      Hasta 3, 5, 7 o 15 días, y una fecha límite. Cada botón dice cuántas
+      facturas y cuánto suman, y al tocarlo chulea solas las facturas de
+      ese rango (respeta el filtro de grupo y la búsqueda).
+    · Nuevo filtro "Solo marcadas" para revisar lo que quedó chuleado.
   v2.8 (5 oct 2026) — Pagos autorizados ordenado por grupos.
     · Las facturas pendientes salen agrupadas como en Programación de
       pagos: Proveedores, Servicios, Personal y Gastos, cada grupo con su
@@ -128,7 +134,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="2.8">
+<meta name="version" content="2.9">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -145,7 +151,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "2.8";
+window.MX_VERSION = "2.9";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -486,6 +492,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .card.blk .ckl .ckrow:first-of-type{border-top:1px solid var(--line)}
 .ckrow{border-left:5px solid transparent}
 .ckrow.venc{border-left-color:#c0392b}.ckrow.prox{border-left-color:#d99a1b}
+
+/* v2.9 rango de vencimiento */
+.rng{display:grid;gap:10px;margin:12px 0}
+.rng-b{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.rng-o{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:10px 12px;border-radius:12px}
+.rng-o small{color:var(--muted);font-weight:500}
+.rng-o.on{background:var(--accent-soft);border-color:var(--accent)}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1090,7 +1103,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         return '\x3cbutton class="row row-btn row-2' + (S.gF === r[0] ? ' on' : '') + '" data-gf="' + r[0] + '">\x3cspan>' + r[1] + ' ›\x3csmall>' + nD(r[2].length).replace('pago', 'factura') + (r[0] === 'venc' && r[2].length ? ' · la más vieja ' + Math.max.apply(null, r[2].map(function (i) { return i.d; })) + ' días' : '') + '\x3c/small>\x3c/span>' + amt(suma(r[2])) + '\x3c/button>';
       }).join(''), totalLbl: 'Total pendiente', total: suma(items) });
     h += '\x3csection class="sec" id="detalle">\x3cdiv class="sec-head">\x3ch2>Facturas pendientes\x3c/h2>\x3cspan class="meta">' + (plazo ? 'Proveedores vencen a ' + plazo + ' días de la factura' : 'Proveedores: vencen el día de la factura') + '\x3c/span>\x3c/div>\x3cdiv class="filters">' +
-      seg('gF', [['all', 'Todas'], ['venc', 'Vencidas'], ['prox', 'Por vencer'], ['sinp', 'Sin programar']]) +
+      seg('gF', [['all', 'Todas'], ['marc', 'Solo marcadas'], ['venc', 'Vencidas'], ['prox', 'Por vencer'], ['sinp', 'Sin programar']]) +
       seg('gCat', [['all', 'Todo'], ['prov', 'Proveedores'], ['serv', 'Servicios'], ['pers', 'Personal'], ['gast', 'Gastos']]) +
       seg('gOrd', [['venc', 'Más vencidas'], ['valor', 'Mayor valor'], ['nom', 'A–Z']]) +
       '\x3cdiv class="pick">\x3clabel>Plazo\x3c/label>' + seg('gPlazo', [['0', 'Contado'], ['15', '15 d'], ['30', '30 d'], ['45', '45 d'], ['60', '60 d']]) + '\x3c/div>' +
@@ -1104,10 +1117,20 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       if (S.gF === 'mas' && !(i.d != null && i.d < -7)) return false;
       if (S.gF === 'sinv' && i.d != null) return false;
       if (S.gF === 'sinp' && x.fProg) return false;
+      if (S.gF === 'marc' && !S.aSel[i.k]) return false;
       if (q && (x.tercero + ' ' + x.factura + ' ' + x.concepto + ' ' + x.sub).toLowerCase().indexOf(q) < 0) return false;
       return true;
     });
     ff.sort(function (a, b) { return S.gOrd === 'valor' ? b.x.saldo - a.x.saldo : S.gOrd === 'nom' ? a.x.tercero.localeCompare(b.x.tercero, 'es') : ((b.d == null ? -9999 : b.d) - (a.d == null ? -9999 : a.d)) || b.x.saldo - a.x.saldo; });
+    var ffR = items.filter(function (i) { var x = i.x; if (S.gCat !== 'all' && x.cat !== S.gCat) return false; if (q && (x.tercero + ' ' + x.factura + ' ' + x.concepto + ' ' + x.sub).toLowerCase().indexOf(q) < 0) return false; return true; });
+    function enRango(i, r) { if (i.d == null) return false; if (r === 'venc') return i.d > 0; if (r === 'hasta') return S.aHasta != null && i.d >= -(S.aHasta - D); return i.d >= -(+r); }
+    var RNG = [['venc', 'Solo vencidas'], ['0', 'Vencidas + hoy'], ['3', 'Hasta 3 días'], ['5', 'Hasta 5 días'], ['7', 'Hasta 7 días'], ['15', 'Hasta 15 días']];
+    S._rngAll = ffR.map(function (i) { return i.k; }); S._rngMap = {};
+    RNG.forEach(function (r) { S._rngMap[r[0]] = ffR.filter(function (i) { return enRango(i, r[0]); }).map(function (i) { return i.k; }); });
+    S._rngHasta = function (f) { return ffR.filter(function (i) { return i.d != null && i.d >= -(f - D); }).map(function (i) { return i.k; }); };
+    h += '\x3cdiv class="panel rng">\x3cb>Marcar por rango de vencimiento\x3c/b>\x3cspan class="meta">Toque una opción y se chulean solas las facturas de la lista que estén en ese rango (quita las demás marcas de la lista).\x3c/span>\x3cdiv class="rng-b">' +
+      RNG.map(function (r) { var n = ffR.filter(function (i) { return enRango(i, r[0]); }); return '\x3cbutton class="btn rng-o' + (S.aRng === r[0] ? ' on' : '') + '" data-rng="' + r[0] + '">\x3cb>' + r[1] + '\x3c/b>\x3csmall>' + n.length + ' fact. · ' + mm(suma(n)) + '\x3c/small>\x3c/button>'; }).join('') +
+      '\x3c/div>\x3cdiv class="pick">\x3clabel>Hasta el\x3c/label>\x3cinput type="date" id="a-hasta" class="search" style="max-width:170px" value="' + (S.aHasta != null ? iso(S.aHasta) : '') + '" aria-label="Marcar las que vencen hasta esta fecha">\x3cspan class="meta">o escoja la fecha límite\x3c/span>\x3c/div>\x3c/div>';
     h += '\x3cdiv class="ck-tools">\x3cspan class="meta">' + nD(ff.length).replace('pago', 'factura') + ' · ' + M(suma(ff)) + '\x3c/span>\x3cspan>\x3cbutton class="btn" data-gall="1">Marcar las ' + ff.length + ' de la lista\x3c/button> \x3cbutton class="btn" data-gnone="1"' + (sel.length ? '' : ' disabled') + '>Quitar todas las marcas\x3c/button>\x3c/span>\x3c/div>';
     var PG = [], PK = [];
     function chipVi(i) { return i.d == null ? chip('neutro', 'Sin vencimiento') : i.d > 0 ? chip('rojo', 'VENCIDA ' + i.d + (i.d === 1 ? ' día' : ' días')) : i.d === 0 ? chip('amarillo', 'Vence hoy') : chip(i.d >= -7 ? 'amarillo' : 'neutro', 'Vence en ' + (-i.d) + (i.d === -1 ? ' día' : ' días')); }
@@ -1127,7 +1150,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         '\x3cdiv class="parties flat">' + gl.map(function (t) {
           var key = 'ap|' + k + '|' + t.name, nv = t.items.filter(function (i) { return i.d != null && i.d > 0; }).length, ns = t.items.filter(function (i) { return S.aSel[i.k]; }).length;
           PG.push(t.items.map(function (i) { return i.k; })); var pi = PG.length - 1; PK.push(key);
-          var abierto = !!S.open[key] || !!q;
+          var abierto = !!S.open[key] || !!q || S.gF === 'marc';
           return '\x3cdetails class="party' + (nv ? ' pv' : '') + '" data-k="' + esc(key) + '"' + (abierto ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot">' + M(t.saldo) + '\x3c/span>' +
             '\x3cspan class="sub">' + (nv ? chip('rojo', nv + (nv === 1 ? ' vencida' : ' vencidas')) : chip('verde', 'Al día')) + '\x3cspan>' + nD(t.items.length).replace('pago', 'factura') + '\x3c/span>' + (ns ? '\x3cspan>\x3cb>' + ns + ' marcadas\x3c/b>\x3c/span>' : '') + '\x3c/span>\x3c/summary>' +
             '\x3cdiv class="ckl">\x3cdiv class="ck-tools" style="padding:8px 14px;border-top:1px solid var(--line)">\x3cspan class="meta">' + esc(t.name) + '\x3c/span>\x3cbutton class="btn" data-pall="' + pi + '">' + (ns === t.items.length ? 'Quitar marcas' : 'Marcar todas') + '\x3c/button>\x3c/div>' +
@@ -1581,6 +1604,9 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     root.querySelectorAll('[data-gf]').forEach(function (b) { b.onclick = function () { S.gF = S.gF === b.dataset.gf ? 'all' : b.dataset.gf; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
     root.querySelectorAll('[data-pall]').forEach(function (b) { b.onclick = function (e) { e.preventDefault(); var ks = (S._pg || [])[+b.dataset.pall] || [], todas = ks.every(function (k) { return S.aSel[k]; }); ks.forEach(function (k) { if (todas) delete S.aSel[k]; else S.aSel[k] = 1; }); render(); }; });
     root.querySelectorAll('[data-gopen]').forEach(function (b) { b.onclick = function () { var v = b.dataset.gopen === '1'; (S._pk || []).forEach(function (k) { S.open[k] = v; }); render(); }; });
+    function marcarRango(fn) { var ks = S._rngAll || []; ks.forEach(function (k) { if (fn(k)) S.aSel[k] = 1; else delete S.aSel[k]; }); if (S.gF === 'venc' || S.gF === 'prox') S.gF = 'all'; }
+    root.querySelectorAll('[data-rng]').forEach(function (b) { b.onclick = function () { var r = b.dataset.rng, m = {}; ((S._rngMap || {})[r] || []).forEach(function (k) { m[k] = 1; }); S.aRng = r; S.aHasta = null; marcarRango(function (k) { return m[k]; }); render(); }; });
+    var ahs = document.getElementById('a-hasta'); if (ahs) ahs.onchange = function () { S.aHasta = ahs.value ? fromIso(ahs.value) : null; if (S.aHasta == null) { S.aRng = null; render(); return; } S.aRng = 'hasta'; var m = {}; S._rngHasta(S.aHasta).forEach(function (k) { m[k] = 1; }); marcarRango(function (k) { return m[k]; }); render(); };
     var ga = root.querySelector('[data-gall]'); if (ga) ga.onclick = function () { root.querySelectorAll('[data-ak]').forEach(function (c) { S.aSel[c.dataset.ak] = 1; }); render(); };
     var gn = root.querySelector('[data-gnone]'); if (gn) gn.onclick = function () { if (confirm('¿Quitar todas las marcas de la lista?')) { S.aSel = {}; render(); } };
     var apf = document.getElementById('a-pf'); if (apf) apf.onchange = function () { S.aFecha = apf.value ? fromIso(apf.value) : null; render(); };

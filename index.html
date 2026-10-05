@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 4.1
+  Flujo de Caja La Matriarca — versión 4.2
 
   HISTORIAL DE VERSIONES
+  v4.2 (5 oct 2026) — Leyenda en los pagos autorizados.
+    · En Disponible real y en el informe guardado se aclara que la
+      programación contempla lo ya vencido y lo próximo a vencer en la
+      semana en curso.
   v4.1 (5 oct 2026) — Disponible real: todo en una sola pantalla.
     · Diseño compacto: el informe completo cabe en la pantalla del celular
       sin subir ni bajar (impuestos y cuentas por cobrar en una sola fila).
@@ -205,7 +209,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="4.1">
+<meta name="version" content="4.2">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -222,7 +226,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "4.1";
+window.MX_VERSION = "4.2";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -616,6 +620,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .dr-d>summary{list-style:none;cursor:pointer}.dr-d>summary::-webkit-details-marker{display:none}
 .dr-bk{grid-auto-flow:row;grid-template-columns:repeat(3,1fr);grid-auto-columns:auto}
 .dr-n{margin:5px 2px 0;font-size:10px;color:var(--muted);line-height:1.25}
+.dr-l{padding:4px 10px;font-size:10.5px;font-style:italic;color:#6d1015;background:#fdecea;border-top:1px solid var(--line)}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1571,6 +1576,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     else if (!doc) h += '\x3cdiv class="dr-w">Sin autorización guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + ': no se descuenta ningún pago.\x3c/div>';
     h += '\x3cdiv class="dr-c">' + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') +
       band('(–) Pagos autorizados', aut, 'no') +
+      '\x3cdiv class="dr-l">Contempla los pagos ya \x3cb>vencidos\x3c/b> y los \x3cb>próximos a vencer\x3c/b> en el transcurso de la semana en curso (' + F(L) + ' – ' + F(L + 6) + ').\x3c/div>' +
       row('Proveedores', g.prov[0], g.prov[1]) + row('Personal', g.pers[0], g.pers[1]) + row('Servicios (arriendos y serv. públicos)', g.serv[0], g.serv[1]) + row('Gastos varios', g.gast[0], g.gast[1]) +
       band('(–) Impuestos', imp, 'no') + (ik.length ? mini(ik.map(function (k) { return [k, im[k]]; })) : mini([['ICO', 0], ['Retención', 0], ['ICA', 0], ['IVA', 0]])) +
       band('Disponible real', real, real < 0 ? 'neg' : 'ok') +
@@ -1599,6 +1605,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     function sm(a) { return a.reduce(function (t, x) { return t + (inc(x) ? x.saldo : 0); }, 0); }
     function cb(attr, val, its) { if (!admin) return ''; var n = its.filter(inc).length, st = n === its.length ? 'all' : n === 0 ? 'none' : 'some'; return '\x3cinput type="checkbox" class="rck no-print" ' + attr + '="' + esc(val) + '" data-st="' + st + '"' + (st === 'all' ? ' checked' : '') + ' aria-label="Incluir en la programación">'; }
     var nOut = doc.items.filter(function (x) { return OUT[x.k]; }).length, totOut = doc.items.reduce(function (t, x) { return t + (OUT[x.k] ? x.saldo : 0); }, 0), totNew = doc.total - totOut;
+    h += '\x3cp class="note" style="margin:6px 0">\x3cb>Esta programación contempla\x3c/b> los pagos ya vencidos y los próximos a vencer en el transcurso de la semana en curso.\x3c/p>';
     if (admin) h += '\x3cp class="note no-print" style="margin:6px 0">Si una factura \x3cb>no se pagó\x3c/b>, quítele el chulito. Cuando termine, toque \x3cb>Procesar cambios\x3c/b> abajo: la factura sale de esta programación y el total se recalcula. El Excel no se modifica.\x3c/p>';
     h += '\x3cdiv class="ck-tools no-print" style="margin:6px 0">\x3cspan class="meta">Toque un grupo o un proveedor para abrirlo o recogerlo\x3c/span>\x3cspan>\x3cbutton class="btn" data-ropen="1">Abrir todos\x3c/button> \x3cbutton class="btn" data-ropen="0">Cerrar todos\x3c/button>\x3c/span>\x3c/div>';
     Object.keys(CATN).forEach(function (k) {

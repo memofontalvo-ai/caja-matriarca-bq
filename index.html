@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 2.2
+  Flujo de Caja La Matriarca — versión 2.3
 
   HISTORIAL DE VERSIONES
+  v2.3 (5 oct 2026) — Programación de pagos más corta.
+    · Cada concepto (Proveedores, Servicios, Personal, Gastos varios)
+      sale cerrado con su título y su total arriba. Al tocarlo se abre
+      el detalle por tercero y al tocarlo otra vez se esconde.
   v2.2 (5 oct 2026) — Último Excel subido.
     · En la parte de arriba de cada módulo se muestra la fecha y hora en
       que se subió el último Excel a la aplicación, quién lo subió y el
@@ -87,7 +91,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="2.2">
+<meta name="version" content="2.3">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -104,7 +108,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "2.2";
+window.MX_VERSION = "2.3";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -375,6 +379,19 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .xl-k{font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;flex-basis:100%}
 .xl-upd b{font-size:16px;color:var(--ink)} .xl-upd b.xl-no{color:var(--warn)}
 .xl-n{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+
+/* v2.3 · conceptos plegables en programación */
+.card.blk>summary.blk-s{list-style:none;display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer}
+.card.blk>summary.blk-s::-webkit-details-marker{display:none}
+.card.blk>summary.blk-s:hover{background:var(--sunk)}
+.blk-t{margin-left:auto;text-align:right;display:grid;gap:1px;flex:none}
+.blk-t small{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.blk-t strong{font-size:20px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.blk .chev{flex:none;font-size:22px;color:var(--muted);transition:transform .15s;line-height:1}
+.card.blk[open] .chev{transform:rotate(90deg)}
+.card.blk[open]>summary.blk-s{border-bottom:1px solid var(--line)}
+.card.blk .card-t{flex:1;min-width:0}
+@media (max-width:420px){.blk-t strong{font-size:18px}.card.blk>summary.blk-s{padding:12px}}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -985,7 +1002,10 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       var g = {}; its.forEach(function (x) { var kk = x.tercero.toLowerCase(); var t = g[kk] || (g[kk] = { name: x.tercero || '(sin nombre)', items: [], valor: 0, saldo: 0 }); t.items.push(x); t.valor += x.valor; t.saldo += x.saldo; });
       var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return (b[campo] - a[campo]) || (b.valor - a.valor); });
       var tv = suma(its, campo), ts = suma(its, 'saldo');
-      return '\x3carticle class="card blk">\x3cheader class="card-h">' + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') + '\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + nDocs(its.length) + '\x3c/small>\x3c/div>\x3c/header>' +
+      var bkey = 'b' + ver + (ver === 'sem' ? L + '.' + (S.gDia || '') : '') + '|' + k;
+      return '\x3cdetails class="card blk" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') +
+        '\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + (ver === 'sem' ? (ts > 0.5 ? ' · falta ' + mm(ts) : ' · todo pagado') : ' · ' + nDocs(its.length)) + '\x3c/small>\x3c/div>' +
+        '\x3cdiv class="blk-t">\x3csmall>' + (ver === 'sem' ? 'Total programado' : 'Total sin pagar') + '\x3c/small>\x3cstrong>' + M(tv) + '\x3c/strong>\x3c/div>\x3cspan class="chev" aria-hidden="true">›\x3c/span>\x3c/summary>' +
         '\x3cdiv class="parties flat">' + gl.map(function (t) {
           var key = 'g' + ver + (ver === 'sem' ? L + '.' + (S.gDia || '') : '') + '|' + k + '|' + t.name;
           var refs = t.items.map(function (x) { return x.factura && x.factura !== 'NO' ? x.factura : x.concepto; }).filter(Boolean);
@@ -1003,7 +1023,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
             }).join('') + '\x3c/div>\x3c/details>';
         }).join('') + '\x3c/div>' +
         (ver === 'sem' && ts > 0.5 && Math.abs(ts - tv) > 0.5 ? '\x3cdiv class="card-x">\x3cdiv class="row">\x3cspan>Falta por pagar\x3c/span>' + amt(ts) + '\x3c/div>\x3c/div>' : '') +
-        '\x3cfooter class="card-f">\x3cspan>Total ' + CATN[k].toLowerCase() + (ver === 'sem' ? ' programado' : ' sin pagar') + '\x3c/span>\x3cstrong>' + M(tv) + '\x3c/strong>\x3c/footer>\x3c/article>';
+        '\x3c/details>';
     }).filter(Boolean);
     h += bloques.length ? bloques.join('') + '\x3cdiv class="sumline">\x3cspan>' + bloques.length + (bloques.length === 1 ? ' concepto' : ' conceptos') + ' · ' + nDocs(ff.length) + '\x3c/span>\x3cb>= ' + M(suma(ff, campo)) + '\x3c/b>\x3c/div>' :
       '\x3cdiv class="panel empty">' + (ver === 'atr' ? 'No hay pagos atrasados de semanas anteriores.' : ver === 'sin' ? 'No hay facturas sin programar.' : 'No hay pagos programados con estos filtros.') + '\x3c/div>';
@@ -1285,6 +1305,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     root.querySelectorAll('[data-go]').forEach(function (b) { b.onclick = function () { var t = b.dataset.go; if (window.MX_NAV && SOLO[t]) window.MX_NAV(t); else go(t); }; });
     root.querySelectorAll('[data-seg]').forEach(function (b) { b.onclick = function () { S[b.dataset.seg] = b.dataset.v; render(); }; });
     root.querySelectorAll('[data-est]').forEach(function (b) { b.onclick = function () { S.est = S.est === b.dataset.est ? 'pend' : b.dataset.est; render(); }; });
+    root.querySelectorAll('details.blk').forEach(function (d) { d.ontoggle = function () { S.open[d.dataset.bk] = d.open; }; });
     root.querySelectorAll('details.party').forEach(function (d) { d.ontoggle = function () { S.open[d.dataset.k] = d.open; if (d.open && d.querySelector('[data-lazy]')) render(); }; });
     root.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { var p = b.dataset.tipo.split('|'); S.cat = p[0]; S.est = 'pend'; S.q = !p[1] || p[1] === 'Sin clasificar' ? '' : p[1]; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
     root.querySelectorAll('[data-emes]').forEach(function (b) { b.onclick = function () { S.eMes = b.dataset.emes === 'all' ? 'all' : +b.dataset.emes; S.ePer = 'all'; S.eDesde = S.eHasta = null; S.eVerTodo = false; window.scrollTo(0, 0); render(); }; });

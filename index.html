@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 4.0
+  Flujo de Caja La Matriarca — versión 4.1
 
   HISTORIAL DE VERSIONES
+  v4.1 (5 oct 2026) — Disponible real: todo en una sola pantalla.
+    · Diseño compacto: el informe completo cabe en la pantalla del celular
+      sin subir ni bajar (impuestos y cuentas por cobrar en una sola fila).
+    · Si el celular es más pequeño, se reduce solo para que quepa todo.
   v4.0 (5 oct 2026) — Nuevo: Disponible real en efectivo.
     · Opción nueva en el menú, con el informe del Excel hecho para el
       celular: caja y bancos + MEGAMAS = total disponible.
@@ -201,7 +205,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="4.0">
+<meta name="version" content="4.1">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -218,7 +222,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "4.0";
+window.MX_VERSION = "4.1";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -590,21 +594,28 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .ck-bar .btn:not(.pri){background:#fff;color:#173D30;border-color:#fff}
 .rep:has(.ck-bar){padding-bottom:110px}
 @media print{.rck{display:none!important}}
-/* v4.0 Disponible real */
-.dr-h{background:var(--ink);color:var(--surface);border-radius:var(--r);padding:16px;margin-bottom:12px}
-.dr-h small{opacity:.7;letter-spacing:.06em;text-transform:uppercase;font-size:11.5px;font-weight:700}
-.dr-h h2{margin:4px 0 4px;font-size:22px}.dr-h p{margin:0 0 10px;font-size:13px;opacity:.8;font-style:italic}
-.dr-f{display:flex;justify-content:space-between;align-items:baseline;background:rgba(255,255,255,.1);border-radius:10px;padding:8px 12px}.dr-f b{font-size:18px}
-.dr-c{padding:0;overflow:hidden}
-.dr-r{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:11px 16px;border-top:1px solid var(--line)}
-.dr-r span{display:flex;flex-direction:column;min-width:0}.dr-r small{color:var(--muted);font-size:12px}
+/* v4.0 Disponible real (compacto, cabe en una pantalla) */
+.dr-main{padding-top:6px!important;padding-bottom:8px!important}
+.dr{font-size:12.5px;line-height:1.2}
+.dr-h{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;background:var(--ink);color:var(--surface);border-radius:10px 10px 0 0;padding:8px 10px}
+.dr-h small{display:block;opacity:.7;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}
+.dr-h h2{margin:1px 0 0;font-size:16px}
+.dr-f{text-align:right}.dr-f b{font-size:13px;white-space:nowrap}
+.dr-w{background:#fff4d6;color:#5b4300;padding:5px 10px;font-size:11px;border:1px solid #e8d08a}
+.dr-c{border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;overflow:hidden;background:var(--surface)}
+.dr-r{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--line);min-height:28px}
+.dr-r em{font-style:normal;color:var(--muted);font-size:10.5px;margin-left:4px}
 .dr-r b{white-space:nowrap;font-variant-numeric:tabular-nums}
-.dr-r.sm{padding:7px 16px 7px 28px;font-size:13.5px;color:var(--muted)}
 .dr-r.tot{background:var(--sunk);font-weight:800;border-top:2px solid var(--ink)}
-.dr-b{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:12px 16px;font-weight:800;color:#fff;border-top:1px solid var(--line)}
-.dr-b b{font-size:19px;white-space:nowrap}
+.dr-b{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 10px;font-weight:800;color:#fff;min-height:30px}
+.dr-b b{font-size:14px;white-space:nowrap}
 .dr-b.ok{background:#245a3a}.dr-b.no{background:#9c2027}.dr-b.neg{background:#6d1015}
-.dr-d>summary{padding:8px 16px;font-size:13px;color:var(--muted);cursor:pointer;border-top:1px solid var(--line)}
+.dr-m{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border-top:1px solid var(--line)}
+.dr-m>div{padding:5px 6px;text-align:center;border-left:1px solid var(--line)}.dr-m>div:first-child{border-left:0}
+.dr-m small{display:block;color:var(--muted);font-size:10px}.dr-m b{font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dr-d>summary{list-style:none;cursor:pointer}.dr-d>summary::-webkit-details-marker{display:none}
+.dr-bk{grid-auto-flow:row;grid-template-columns:repeat(3,1fr);grid-auto-columns:auto}
+.dr-n{margin:5px 2px 0;font-size:10px;color:var(--muted);line-height:1.25}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -751,15 +762,16 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         var ct = t[0] === 'pagar' ? '\x3cspan class="ct">' + mm(R.pend.tAll) + '\x3c/span>' : t[0] === 'resumen' && A.filter(function (a) { return a.n === 'rojo'; }).length ? '\x3cspan class="ct">' + A.filter(function (a) { return a.n === 'rojo'; }).length + ' alertas\x3c/span>' : '';
         return '\x3cbutton role="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + ct + '\x3c/button>';
       }).join('') + (SOLO[MODE] ? '' : '\x3c/nav>\x3c/div>') + '\x3c/header>';
-    html += '\x3cmain class="wrap fade">' + xlsStrip();
+    html += '\x3cmain class="wrap fade' + (MODE === 'disp' ? ' dr-main' : '') + '">' + (MODE === 'disp' ? '' : xlsStrip());
     if (pending) html += '\x3cdiv class="banner">\x3cspan>Está viendo \x3cb>' + esc(pending.name) + '\x3c/b>, cargado ahora. ' + (artifactNS ? 'Guárdelo para que esta página lo muestre a todos.' : 'Solo usted lo ve en este dispositivo; para guardarlo para todos, ábralo con una cuenta con permiso de edición.') + '\x3c/span>\x3cspan style="display:flex;gap:8px">' + (artifactNS ? '\x3cbutton class="btn pri" id="save">Guardar para todos\x3c/button>' : '') + '\x3cbutton class="btn" id="discard">Volver a los datos guardados\x3c/button>\x3c/span>\x3c/div>';
     if (S.err) html += '\x3cdiv class="banner err">\x3cspan>' + esc(S.err) + '\x3c/span>\x3cbutton class="btn" id="err-x">Cerrar\x3c/button>\x3c/div>';
-    if (S.tab !== 'resumen') html += '\x3cdiv class="meta">Datos del Excel “Tesorería Integrada” · fecha del informe en el archivo: ' + F(W.fechaInforme, true) + ' · control desde el ' + F(W.inicio, true) + ' · cargado ' + fmtStamp(W.cargado) + '\x3c/div>';
+    if (S.tab !== 'resumen' && MODE !== 'disp') html += '\x3cdiv class="meta">Datos del Excel “Tesorería Integrada” · fecha del informe en el archivo: ' + F(W.fechaInforme, true) + ' · control desde el ' + F(W.inicio, true) + ' · cargado ' + fmtStamp(W.cargado) + '\x3c/div>';
     html += ({ auth: vAuth, prog: vProg, egresos: vEgresos, ventas: vVentas, resumen: vResumen, disp: vDisp, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
     html += '\x3c/main>\x3cdiv id="tip" hidden>\x3c/div>';
     var sy = window.scrollY;
     root.innerHTML = html;
     window.scrollTo(0, sy);
+    if (MODE === 'disp') { dispAjustar(); setTimeout(dispAjustar, 60); }
     bind();
   }
   function stampLargo(s) { try { return new Date(s).toLocaleString('es-CO', { timeZone: 'America/Bogota', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); } catch (e) { return ''; } }
@@ -1547,23 +1559,30 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var g = { prov: [0, 0], pers: [0, 0], serv: [0, 0], gast: [0, 0] };
     if (doc) doc.items.forEach(function (x) { var a = g[x.cat]; if (a) { a[0] += x.saldo; a[1]++; } });
     var aut = doc ? doc.total : 0, imp = R.imp, real = total - aut - imp, otras = R.otras;
-    function row(l, v, cls, sub) { return '\x3cdiv class="dr-r' + (cls ? ' ' + cls : '') + '">\x3cspan>' + esc(l) + (sub ? '\x3csmall>' + esc(sub) + '\x3c/small>' : '') + '\x3c/span>\x3cb>' + M(v) + '\x3c/b>\x3c/div>'; }
+    function row(l, v, n) { return '\x3cdiv class="dr-r">\x3cspan>' + esc(l) + (n != null ? ' \x3cem>(' + n + ')\x3c/em>' : '') + '\x3c/span>\x3cb>' + M(v) + '\x3c/b>\x3c/div>'; }
     function band(l, v, cls) { return '\x3cdiv class="dr-b ' + cls + '">\x3cspan>' + esc(l) + '\x3c/span>\x3cb>' + M(v) + '\x3c/b>\x3c/div>'; }
+    function mini(list) { return '\x3cdiv class="dr-m">' + list.map(function (x) { return '\x3cdiv>\x3csmall>' + esc(x[0]) + '\x3c/small>\x3cb>' + M(x[1]) + '\x3c/b>\x3c/div>'; }).join('') + '\x3c/div>'; }
     var bancos = '';
-    if (R.real.row) bancos = '\x3cdetails class="dr-d">\x3csummary>Ver saldo por banco y caja\x3c/summary>' + W.realCols.map(function (c, i) { return R.real.row.v[i] ? row(c.name, R.real.row.v[i], 'sm') : ''; }).join('') + '\x3c/details>';
-    var h = '\x3csection class="dr">\x3cheader class="dr-h">\x3csmall>La Matriarca · Tesorería\x3c/small>\x3ch2>Disponible real de efectivo\x3c/h2>\x3cp>Informe para Junta Directiva — Efectivo disponible neto, descontando solo los pagos autorizados\x3c/p>\x3cdiv class="dr-f">\x3cspan>Fecha del informe\x3c/span>\x3cb>' + F(S.D, true) + '\x3c/b>\x3c/div>\x3c/header>';
-    if (cargando) h += '\x3cdiv class="panel empty">Leyendo la autorización guardada…\x3c/div>';
-    else if (!doc) h += '\x3cdiv class="banner">\x3cspan>No hay una autorización de pagos guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + '. Por eso no se descuenta ningún pago. Entre a “Pagos autorizados”, escoja las facturas y guarde.\x3c/span>\x3c/div>';
-    h += '\x3cdiv class="card dr-c">' + row('Saldo en Caja y Bancos (real, según extracto/app)', caja) + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') +
+    if (R.real.row) bancos = '\x3cdetails class="dr-d">\x3csummary class="dr-r">\x3cspan>Saldo en Caja y Bancos \x3cem>▾ ver\x3c/em>\x3c/span>\x3cb>' + M(caja) + '\x3c/b>\x3c/summary>\x3cdiv class="dr-m dr-bk">' + W.realCols.map(function (c, i) { return R.real.row.v[i] ? '\x3cdiv>\x3csmall>' + esc(c.name) + '\x3c/small>\x3cb>' + M(R.real.row.v[i]) + '\x3c/b>\x3c/div>' : ''; }).join('') + '\x3c/div>\x3c/details>';
+    else bancos = row('Saldo en Caja y Bancos', caja);
+    var ik = Object.keys(im);
+    var h = '\x3csection class="dr" id="dr">\x3cdiv class="dr-h">\x3cdiv>\x3csmall>La Matriarca · Informe para Junta Directiva\x3c/small>\x3ch2>Disponible real de efectivo\x3c/h2>\x3c/div>\x3cdiv class="dr-f">\x3csmall>Fecha del informe\x3c/small>\x3cb>' + F(S.D, true) + '\x3c/b>\x3c/div>\x3c/div>';
+    if (cargando) h += '\x3cdiv class="dr-w">Leyendo la autorización guardada…\x3c/div>';
+    else if (!doc) h += '\x3cdiv class="dr-w">Sin autorización guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + ': no se descuenta ningún pago.\x3c/div>';
+    h += '\x3cdiv class="dr-c">' + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') +
       band('(–) Pagos autorizados', aut, 'no') +
-      row('Proveedores', g.prov[0], '', g.prov[1] + (g.prov[1] === 1 ? ' factura' : ' facturas')) + row('Personal', g.pers[0], '', g.pers[1] + (g.pers[1] === 1 ? ' pago' : ' pagos')) +
-      row('Servicios (arriendos, servicios públicos)', g.serv[0], '', g.serv[1] + (g.serv[1] === 1 ? ' factura' : ' facturas')) + row('Gastos varios', g.gast[0], '', g.gast[1] + (g.gast[1] === 1 ? ' pago' : ' pagos')) +
-      band('(–) Impuestos', imp, 'no') + (Object.keys(im).length ? Object.keys(im).map(function (k) { return row(k, im[k]); }).join('') : row('Sin impuestos provisionados', 0)) +
+      row('Proveedores', g.prov[0], g.prov[1]) + row('Personal', g.pers[0], g.pers[1]) + row('Servicios (arriendos y serv. públicos)', g.serv[0], g.serv[1]) + row('Gastos varios', g.gast[0], g.gast[1]) +
+      band('(–) Impuestos', imp, 'no') + (ik.length ? mini(ik.map(function (k) { return [k, im[k]]; })) : mini([['ICO', 0], ['Retención', 0], ['ICA', 0], ['IVA', 0]])) +
       band('Disponible real', real, real < 0 ? 'neg' : 'ok') +
-      band('(+) Otras cuentas por cobrar', otras, 'ok') + row('Cuentas por cobrar — Empleados', R.cxc.emp) + row('Cuentas por cobrar — Socios', R.cxc.soc) + row('Cuentas por cobrar — Otros', R.cxc.otr) +
+      band('(+) Otras cuentas por cobrar', otras, 'ok') + mini([['Empleados', R.cxc.emp], ['Socios', R.cxc.soc], ['Otros', R.cxc.otr]]) +
       '\x3cdiv class="dr-r tot">\x3cspan>Disponible si se cobran las otras cuentas\x3c/span>\x3cb>' + M(real + otras) + '\x3c/b>\x3c/div>\x3c/div>';
-    if (doc) h += '\x3cp class="meta">Pagos autorizados: ' + doc.n + ' · semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + (doc.fechaPago ? ' · pagos para el ' + F(doc.fechaPago, true) : '') + ' · autorizó ' + esc(doc.por || '') + ' · guardado ' + esc(stampLargo(doc.guardadoISO)) + (doc.retirados && doc.retirados.length ? ' · ' + doc.retirados.length + ' retiradas' : '') + '. Lo vencido o programado que no se autorizó no se descuenta.\x3c/p>';
+    if (doc) h += '\x3cp class="dr-n">' + doc.n + ' pagos autorizados · semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + (doc.fechaPago ? ' · pagos para el ' + F(doc.fechaPago, true) : '') + ' · autorizó ' + esc(doc.por || '') + ' · guardado ' + esc(stampLargo(doc.guardadoISO)) + (doc.retirados && doc.retirados.length ? ' · ' + doc.retirados.length + ' retiradas' : '') + '. Lo no autorizado no se descuenta.\x3c/p>';
     return h + '\x3c/section>';
+  }
+  function dispAjustar() {
+    var el = document.getElementById('dr'); if (!el) return;
+    el.style.zoom = ''; var top = el.getBoundingClientRect().top, vh = window.innerHeight, nat = el.getBoundingClientRect().height, av = vh - top - 6;
+    if (nat > av && av > 200) el.style.zoom = Math.max(0.55, av / nat).toFixed(3);
   }
   function vAuthRep(doc, liveMap, admin) {
     if (!doc) return '\x3cdiv class="panel empty">' + (admin ? 'Aún no ha guardado una autorización para esta semana. Entre a “Autorizar pagos”.' : 'El administrador todavía no ha autorizado pagos para esta semana.') + '\x3c/div>';

@@ -1,8 +1,15 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 3.8
+  Flujo de Caja La Matriarca — versión 3.9
 
   HISTORIAL DE VERSIONES
+  v3.9 (5 oct 2026) — Quitar facturas no pagadas de la programación.
+    · En el informe guardado (solo administrador) cada factura, cada
+      proveedor y cada grupo tienen su casilla con chulito (todas marcadas).
+    · Si algo no se pagó, se quita el chulito y se toca "Procesar cambios":
+      la factura sale de la programación, el total y la cantidad se
+      recalculan y queda el historial (quién, cuándo, motivo).
+    · Las facturas retiradas quedan listadas aparte. El Excel no se toca.
   v3.8 (5 oct 2026) — Pagos autorizados siempre inicia cerrado.
     · Al entrar a Pagos autorizados, los grupos y los proveedores salen
       cerrados (solo se ve el título y el total de cada grupo). Se abren
@@ -187,7 +194,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="3.8">
+<meta name="version" content="3.9">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -204,7 +211,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "3.8";
+window.MX_VERSION = "3.9";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -564,6 +571,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   .rep .party{break-inside:avoid}
   .rep .rp-row.venc{background:#fdecea!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+/* v3.9 casillas en informe guardado */
+.rck{width:24px;height:24px;flex:none;accent-color:#1f7a4d;cursor:pointer;margin:0}
+.rp-row.ed{grid-template-columns:auto minmax(0,1fr) auto;align-items:start}
+.rp-row.ed .rck{margin-top:2px}
+.rp-row.out{opacity:.55}.rp-row.out .rp-v{text-decoration:line-through}
+#rep-auth .party>summary:has(>.rck){grid-template-columns:auto minmax(0,1fr) auto;align-items:center}
+#rep-auth .party>summary>.rck{grid-row:span 2;align-self:start;margin-top:2px}
+#rep-auth .party>summary:has(>.rck)>.sub{grid-column:2 / 4}
+.rep .blk-s>.rck{margin-right:2px}
+.ck-bar .btn:not(.pri){background:#fff;color:#173D30;border-color:#fff}
+.rep:has(.ck-bar){padding-bottom:110px}
+@media print{.rck{display:none!important}}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1124,6 +1143,22 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       S.err = (e && e.code === 'permission-denied') ? 'Su usuario no tiene permiso para guardar autorizaciones. Solo el administrador puede.' : 'No se pudo guardar la autorización: ' + (e && e.message || 'error desconocido'); render();
     });
   }
+  function repProcesar() {
+    var id = iso(S.aWeek), doc = S.aDocs[id], O = S.rOut || {}; if (!doc) return;
+    var quitar = doc.items.filter(function (x) { return O[x.k]; }); if (!quitar.length) return;
+    var qT = quitar.reduce(function (t, x) { return t + x.saldo; }, 0);
+    if (!confirm('¿Quitar ' + quitar.length + (quitar.length === 1 ? ' factura' : ' facturas') + ' (' + M(qT) + ') de esta programación?\nEl Excel no se modifica.')) return;
+    var motivo = window.prompt('Motivo (opcional): por qué no se pagó', '') || '';
+    var items = doc.items.filter(function (x) { return !O[x.k]; }), total = items.reduce(function (t, x) { return t + x.saldo; }, 0), por = window.MX_USERNAME || '', ahora = new Date().toISOString();
+    var ret = (doc.retirados || []).concat(quitar.map(function (x) { return { k: x.k, cat: x.cat, tercero: x.tercero, factura: x.factura || '', concepto: x.concepto || '', saldo: x.saldo, motivo: motivo, en: ahora, por: por }; }));
+    var docN = {}; Object.keys(doc).forEach(function (k) { docN[k] = doc[k]; });
+    docN.items = items; docN.total = total; docN.n = items.length; docN.retirados = ret; docN.rev = (doc.rev || 0) + 1; docN.modificadoISO = ahora; docN.modificadoPor = por;
+    docN.hist = (doc.hist || []).concat([{ en: ahora, por: por, n: items.length, total: total, quito: quitar.length, quitoTotal: qT, motivo: motivo }]).slice(-20);
+    var b = document.getElementById('r-proc'); if (b) { b.disabled = true; b.textContent = 'Guardando…'; }
+    window.MX_AUTH.save(id, docN).then(function () { S.aDocs[id] = docN; S.rOut = {}; S.err = null; render(); }).catch(function (e) {
+      S.err = (e && e.code === 'permission-denied') ? 'Su usuario no tiene permiso para modificar autorizaciones. Solo el administrador puede.' : 'No se pudo guardar el cambio: ' + (e && e.message || 'error'); render();
+    });
+  }
   function textoAut(doc) {
     var L = ['AUTORIZACIÓN DE PAGOS · La Matriarca', 'Semana: ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + MX.toJS(doc.lunes).getUTCFullYear(), doc.fechaPago ? 'Pagos para el ' + F(doc.fechaPago, true) : '', 'Autorizó: ' + (doc.por || '') + ' · ' + stampLargo(doc.guardadoISO), ''].filter(function (s, i) { return s !== '' || i === 4; });
     Object.keys(CATN).forEach(function (k) {
@@ -1492,7 +1527,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       '\x3cspan>\x3csmall>Autorizó\x3c/small>\x3cb>' + esc(doc.por || '') + '\x3c/b>\x3c/span>\x3cspan>\x3csmall>Guardado\x3c/small>\x3cb>' + esc(stampLargo(doc.guardadoISO)) + '\x3c/b>\x3c/span>' +
       '\x3cspan>\x3csmall>Pagos\x3c/small>\x3cb>' + doc.n + '\x3c/b>\x3c/span>\x3cspan>\x3csmall>Total\x3c/small>\x3cb>' + M(doc.total) + '\x3c/b>\x3c/span>\x3c/div>\x3c/header>';
     var pagadas = 0, pagadasT = 0, RK = [];
-    function sm(a) { return a.reduce(function (t, x) { return t + x.saldo; }, 0); }
+    if (S._rOutId !== doc.semana) { S._rOutId = doc.semana; S.rOut = {}; }
+    var OUT = S.rOut || (S.rOut = {});
+    function inc(x) { return !OUT[x.k]; }
+    function sm(a) { return a.reduce(function (t, x) { return t + (inc(x) ? x.saldo : 0); }, 0); }
+    function cb(attr, val, its) { if (!admin) return ''; var n = its.filter(inc).length, st = n === its.length ? 'all' : n === 0 ? 'none' : 'some'; return '\x3cinput type="checkbox" class="rck no-print" ' + attr + '="' + esc(val) + '" data-st="' + st + '"' + (st === 'all' ? ' checked' : '') + ' aria-label="Incluir en la programación">'; }
+    var nOut = doc.items.filter(function (x) { return OUT[x.k]; }).length, totOut = doc.items.reduce(function (t, x) { return t + (OUT[x.k] ? x.saldo : 0); }, 0), totNew = doc.total - totOut;
+    if (admin) h += '\x3cp class="note no-print" style="margin:6px 0">Si una factura \x3cb>no se pagó\x3c/b>, quítele el chulito. Cuando termine, toque \x3cb>Procesar cambios\x3c/b> abajo: la factura sale de esta programación y el total se recalcula. El Excel no se modifica.\x3c/p>';
     h += '\x3cdiv class="ck-tools no-print" style="margin:6px 0">\x3cspan class="meta">Toque un grupo o un proveedor para abrirlo o recogerlo\x3c/span>\x3cspan>\x3cbutton class="btn" data-ropen="1">Abrir todos\x3c/button> \x3cbutton class="btn" data-ropen="0">Cerrar todos\x3c/button>\x3c/span>\x3c/div>';
     Object.keys(CATN).forEach(function (k) {
       var its = doc.items.filter(function (x) { return x.cat === k; }); if (!its.length) return;
@@ -1500,24 +1541,27 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       var gl = Object.keys(g).map(function (kk) { var t = g[kk]; t.items.sort(function (p1, q1) { return (q1.dias == null ? -9999 : q1.dias) - (p1.dias == null ? -9999 : p1.dias); }); t.max = t.items[0].dias == null ? -9999 : t.items[0].dias; t.saldo = sm(t.items); return t; }).sort(function (p1, q1) { return (q1.max - p1.max) || (q1.saldo - p1.saldo); });
       var bkey = 'br|' + k, nVc = its.filter(function (x) { return x.dias != null && x.dias > 0; }).length;
       RK.push(bkey);
-      h += '\x3cdetails class="card blk rep-c" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') +
+      h += '\x3cdetails class="card blk rep-c" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + cb('data-rgc', k, its) + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') +
         '\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + its.length + (its.length === 1 ? ' pago' : ' pagos') + (nVc ? ' · \x3cspan class="neg">' + nVc + ' vencidas\x3c/span>' : '') + '\x3c/small>\x3c/div>' +
         '\x3cdiv class="blk-t">\x3csmall>Total autorizado\x3c/small>\x3cstrong>' + M(sm(its)) + '\x3c/strong>\x3c/div>\x3cspan class="chev" aria-hidden="true">›\x3c/span>\x3c/summary>\x3cdiv class="parties flat">' +
         gl.map(function (t) {
           var key = 'rp|' + k + '|' + t.name, nv = t.items.filter(function (x) { return x.dias != null && x.dias > 0; }).length; RK.push(key);
-          return '\x3cdetails class="party' + (nv ? ' pv' : '') + '" data-k="' + esc(key) + '"' + (S.open[key] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot">' + M(t.saldo) + '\x3c/span>\x3cspan class="sub">' + (nv ? chip('rojo', nv + (nv === 1 ? ' vencida' : ' vencidas')) : chip('verde', 'Al día')) + '\x3cspan>' + t.items.length + (t.items.length === 1 ? ' factura' : ' facturas') + '\x3c/span>\x3c/span>\x3c/summary>' +
+          return '\x3cdetails class="party' + (nv ? ' pv' : '') + '" data-k="' + esc(key) + '"' + (S.open[key] ? ' open' : '') + '>\x3csummary>' + cb('data-rgp', k + '|' + t.name, t.items) + '\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot">' + M(t.saldo) + '\x3c/span>\x3cspan class="sub">' + (nv ? chip('rojo', nv + (nv === 1 ? ' vencida' : ' vencidas')) : chip('verde', 'Al día')) + '\x3cspan>' + t.items.length + (t.items.length === 1 ? ' factura' : ' facturas') + '\x3c/span>\x3c/span>\x3c/summary>' +
             '\x3cdiv class="rp-list">' + t.items.map(function (x) {
               var lv = liveMap[x.k], pagadaEx = !lv;
-              if (pagadaEx) { pagadas++; pagadasT += x.saldo; }
+              if (pagadaEx && inc(x)) { pagadas++; pagadasT += x.saldo; }
               var chipA = x.dias == null ? chip('neutro', 'Sin vencimiento') : x.dias > 0 ? chip('rojo', 'VENCIDA ' + x.dias + (x.dias === 1 ? ' día' : ' días')) : chip('neutro', x.dias === 0 ? 'Vence hoy' : 'Vence en ' + (-x.dias) + ' d');
               var chipE = pagadaEx ? chip('verde', 'Ya no está pendiente en el Excel') : chip('amarillo', 'Pendiente en el Excel');
               var l2 = [x.fDoc ? 'Factura ' + F(x.fDoc) : '', x.venc != null ? 'Vence ' + F(x.venc) : '', x.fProg ? 'Programada ' + F(x.fProg) : 'Sin programar'].filter(Boolean).join(' · ');
-              return '\x3cdiv class="rp-row' + (x.dias != null && x.dias > 0 ? ' venc' : '') + '">\x3cdiv class="rp-a">\x3cb>' + esc(refDe(x)) + '\x3c/b>\x3cspan class="meta">' + CATN[x.cat] + (x.sub && x.cat !== 'pers' ? ' · ' + esc(x.sub) : '') + '\x3c/span>\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3cspan class="rp-chips">' + chipA + ' \x3cspan class="no-print">' + chipE + '\x3c/span>\x3c/span>\x3c/div>\x3cdiv class="rp-v">' + M(x.saldo) + '\x3c/div>\x3c/div>';
+              var o = !inc(x);
+              return '\x3cdiv class="rp-row' + (admin ? ' ed' : '') + (x.dias != null && x.dias > 0 ? ' venc' : '') + (o ? ' out' : '') + '">' + (admin ? '\x3cinput type="checkbox" class="rck no-print" data-rk="' + esc(x.k) + '"' + (o ? '' : ' checked') + ' aria-label="Pagada / incluida">' : '') + '\x3cdiv class="rp-a">\x3cb>' + esc(refDe(x)) + '\x3c/b>\x3cspan class="meta">' + CATN[x.cat] + (x.sub && x.cat !== 'pers' ? ' · ' + esc(x.sub) : '') + '\x3c/span>\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3cspan class="rp-chips">' + chipA + ' \x3cspan class="no-print">' + (o ? chip('rojo', 'Se quitará al procesar') : chipE) + '\x3c/span>\x3c/span>\x3c/div>\x3cdiv class="rp-v">' + M(x.saldo) + '\x3c/div>\x3c/div>';
             }).join('') + '\x3c/div>\x3cdiv class="rp-sub">\x3cspan>Subtotal ' + esc(t.name) + '\x3c/span>\x3cb>' + M(t.saldo) + '\x3c/b>\x3c/div>\x3c/details>';
         }).join('') + '\x3c/div>\x3cdiv class="rp-sub">\x3cspan>Total ' + CATN[k].toLowerCase() + '\x3c/span>\x3cb>' + M(sm(its)) + '\x3c/b>\x3c/div>\x3c/details>';
     });
     S._rk = RK;
-    h += '\x3cdiv class="rep-tot">\x3cspan>Total autorizado\x3c/span>\x3cstrong>' + M(doc.total) + '\x3c/strong>\x3c/div>';
+    h += '\x3cdiv class="rep-tot">\x3cspan>Total autorizado\x3c/span>\x3cstrong>' + M(totNew) + '\x3c/strong>\x3c/div>';
+    if (doc.retirados && doc.retirados.length) h += '\x3cdetails class="card no-print" style="margin-top:10px">\x3csummary style="padding:12px 16px;font-weight:700">Facturas retiradas de esta programación (' + doc.retirados.length + ')\x3c/summary>\x3cdiv class="rp-list">' + doc.retirados.map(function (r) { return '\x3cdiv class="rp-row">\x3cdiv class="rp-a">\x3cb>' + esc(r.tercero || '') + ' · ' + esc(r.factura || r.concepto || '') + '\x3c/b>\x3cspan class="meta">' + esc(stampLargo(r.en)) + ' · ' + esc(r.por || '') + (r.motivo ? ' · ' + esc(r.motivo) : '') + '\x3c/span>\x3c/div>\x3cdiv class="rp-v">' + M(r.saldo) + '\x3c/div>\x3c/div>'; }).join('') + '\x3c/div>\x3c/details>';
+    if (admin && nOut) h += '\x3cdiv class="ck-bar no-print">\x3cdiv>\x3csmall>Se quitan ' + nOut + (nOut === 1 ? ' factura' : ' facturas') + ' (' + M(totOut) + ')\x3c/small>\x3cb>Nuevo total ' + M(totNew) + '\x3c/b>\x3c/div>\x3cspan>\x3cbutton class="btn" id="r-undo">Deshacer\x3c/button> \x3cbutton class="btn pri" id="r-proc">Procesar cambios\x3c/button>\x3c/span>\x3c/div>';
     if (pagadas) h += '\x3cp class="note no-print">' + pagadas + (pagadas === 1 ? ' pago autorizado ya no aparece' : ' pagos autorizados ya no aparecen') + ' como pendiente en el último Excel (' + M(pagadasT) + '): lo más probable es que ya se pagaron.\x3c/p>';
     h += '\x3cdiv class="rep-sign">\x3cdiv>Autorizó\x3c/div>\x3cdiv>Recibido contabilidad\x3c/div>\x3c/div>';
     h += '\x3cdiv class="ck-share no-print">\x3cspan>\x3cbutton class="btn pri" data-apdf="1">Descargar PDF (tamaño carta)\x3c/button> \x3cbutton class="btn" data-aview="1">Ver PDF\x3c/button> \x3cbutton class="btn" data-ashare="1">Compartir como texto\x3c/button>\x3c/span>\x3cspan class="meta">El PDF trae una hoja por proveedor (con sus facturas y total) y al final el informe de todo lo que se paga.\x3c/span>\x3c/div>\x3c/section>';
@@ -1942,6 +1986,19 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var anx = document.getElementById('a-next'); if (anx) anx.onclick = function () { S.aWeek += 7; S.aInit = null; render(); };
     var asv = document.getElementById('a-save'); if (asv) asv.onclick = autGuardar;
     root.querySelectorAll('[data-ropen]').forEach(function (b) { b.onclick = function () { var v = b.dataset.ropen === '1'; (S._rk || []).forEach(function (k) { S.open[k] = v; }); render(); }; });
+    root.querySelectorAll('input.rck').forEach(function (c) {
+      if (c.dataset.st === 'some') c.indeterminate = true;
+      c.onclick = function (e) { e.stopPropagation(); };
+      c.onchange = function () {
+        var dc = S.aDocs[iso(S.aWeek)]; if (!dc) return; var O = S.rOut || (S.rOut = {}), on = c.checked, ks = [];
+        if (c.dataset.rk) ks = [c.dataset.rk];
+        else if (c.dataset.rgc) ks = dc.items.filter(function (x) { return x.cat === c.dataset.rgc; }).map(function (x) { return x.k; });
+        else if (c.dataset.rgp) { var pp = c.dataset.rgp, i = pp.indexOf('|'), ct = pp.slice(0, i), nm = pp.slice(i + 1); ks = dc.items.filter(function (x) { return x.cat === ct && (x.tercero || '(sin nombre)') === nm; }).map(function (x) { return x.k; }); }
+        ks.forEach(function (k) { if (on) delete O[k]; else O[k] = 1; }); render();
+      };
+    });
+    var rud = document.getElementById('r-undo'); if (rud) rud.onclick = function () { S.rOut = {}; render(); };
+    var rpc = document.getElementById('r-proc'); if (rpc) rpc.onclick = repProcesar;
     var apd = root.querySelector('[data-apdf]'); if (apd) apd.onclick = function () { var dc = S.aDocs[iso(S.aWeek)]; if (dc) pdfEntregar(dc, false); };
     var avw = root.querySelector('[data-aview]'); if (avw) avw.onclick = function () { var dc = S.aDocs[iso(S.aWeek)]; if (dc) pdfEntregar(dc, true); };
     var apr = root.querySelector('[data-aprint]'); if (apr) apr.onclick = function () { window.print(); };

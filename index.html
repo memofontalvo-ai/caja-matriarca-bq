@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 4.8
+  Flujo de Caja La Matriarca — versión 4.9
 
   HISTORIAL DE VERSIONES
+  v4.9 (5 oct 2026) — Disponible real: detalle de cuentas por cobrar.
+    · Empleados, Socios y Otros se abren con "ver" y muestran el movimiento
+      diario de ese grupo (saldo y cuánto subió o bajó). El Excel solo trae
+      el total diario, sin nombres de personas.
   v4.8 (5 oct 2026) — Disponible real: nuevo título y cifras.
     · "Disponible + cuentas por cobrar" va en tarjeta propia, resaltada y
       con la cifra más grande. El Disponible real baja un poco de tamaño.
@@ -233,7 +237,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="4.8">
+<meta name="version" content="4.9">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -250,7 +254,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "4.8";
+window.MX_VERSION = "4.9";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -674,6 +678,17 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .dr-hero2.neg{background:linear-gradient(180deg,#9c2027,#6d1015)}
 .dr-hero2 small{display:block;font-size:14px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;color:#FFF8E7}
 .dr-hero2 b{display:block;font-size:40px;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+/* v4.9 detalle diario de cuentas por cobrar */
+.dr-cb{border:0;background:transparent;font:inherit;color:inherit;cursor:pointer;text-align:center;padding:5px 4px 4px;border-left:1px solid var(--line)}
+.dr-cb:first-child{border-left:0}
+.dr-cb small{display:block;color:var(--muted);font-size:11.5px}.dr-cb b{display:block;font-size:14px;white-space:nowrap}
+.dr-cb i{display:block;font-style:normal;font-size:11px;color:#245a3a;font-weight:700}
+.dr-cb.on{background:var(--sunk)}
+.dr-cp{border-top:2px solid #245a3a;background:var(--surface)}
+.dr-cph{padding:6px 12px 2px}.dr-cph b{display:block;font-size:13.5px}.dr-cph span{font-size:11.5px;color:var(--muted)}
+.dr-cp .dr-r.sm{min-height:24px;padding:3px 12px;font-size:13px;display:grid;grid-template-columns:1fr auto auto;gap:12px}
+.dr-cd{color:var(--muted);font-variant-numeric:tabular-nums}.dr-cd.up{color:#9c2027}.dr-cd.dn{color:#245a3a}
+.dr-cn{padding:5px 12px 7px;font-size:11px;color:var(--muted);font-style:italic}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1676,6 +1691,20 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     function row(l, v, n) { return '\x3cdiv class="dr-r">\x3cspan>' + esc(l) + (n != null ? ' \x3cem>(' + n + ')\x3c/em>' : '') + '\x3c/span>\x3cb>' + M(v) + '\x3c/b>\x3c/div>'; }
     function band(l, v, cls) { return '\x3cdiv class="dr-b ' + cls + '">\x3cspan>' + esc(l) + '\x3c/span>\x3cb>' + M(v) + '\x3c/b>\x3c/div>'; }
     function mini(list) { return '\x3cdiv class="dr-m">' + list.map(function (x) { return '\x3cdiv>\x3csmall>' + esc(x[0]) + '\x3c/small>\x3cb>' + M(x[1]) + '\x3c/b>\x3c/div>'; }).join('') + '\x3c/div>'; }
+    var NC = { emp: 'Empleados', soc: 'Socios', otr: 'Otros' };
+    function cxcCeldas(R) { return '\x3cdiv class="dr-m dr-cx">' + ['emp', 'soc', 'otr'].map(function (k) { return '\x3cbutton type="button" class="dr-cb' + (S.cxcSel === k ? ' on' : '') + '" data-cx="' + k + '" aria-expanded="' + (S.cxcSel === k) + '">\x3csmall>' + NC[k] + '\x3c/small>\x3cb>' + M(R.cxc[k]) + '\x3c/b>\x3ci>' + (S.cxcSel === k ? 'cerrar ▴' : 'ver ▾') + '\x3c/i>\x3c/button>'; }).join('') + '\x3c/div>'; }
+    function cxcPanel(R) {
+      var k = S.cxcSel; if (!k) return '';
+      var all = W.cxc.filter(function (r) { return r.f <= S.D; }).sort(function (a, b) { return a.f - b.f; });
+      var ult = all.slice(-10), ini = all.length - ult.length;
+      var h = '\x3cdiv class="dr-cp">\x3cdiv class="dr-cph">\x3cb>' + NC[k] + ' · movimiento diario\x3c/b>\x3cspan>Si baja, se cobró; si sube, se prestó más.\x3c/span>\x3c/div>';
+      if (!ult.length) return h + '\x3cdiv class="dr-r">Sin registros en el Excel.\x3c/div>\x3c/div>';
+      h += ult.slice().reverse().map(function (r, i) {
+        var idx = ult.length - 1 - i, prev = idx > 0 ? ult[idx - 1] : (ini > 0 ? all[ini - 1] : null), d = prev ? r[k] - prev[k] : null;
+        return '\x3cdiv class="dr-r sm">\x3cspan>' + F(r.f) + '\x3c/span>\x3cspan class="dr-cd ' + (d == null || d === 0 ? '' : d > 0 ? 'up' : 'dn') + '">' + (d == null ? '' : d === 0 ? 'sin cambio' : (d > 0 ? '+' : '–') + M(Math.abs(d))) + '\x3c/span>\x3cb>' + M(r[k]) + '\x3c/b>\x3c/div>';
+      }).join('');
+      return h + '\x3cdiv class="dr-cn">El Excel guarda solo el total diario de cada grupo; no trae los nombres de las personas.\x3c/div>\x3c/div>';
+    }
     var bancos = '';
     if (R.real.row) bancos = '\x3cdetails class="dr-d">\x3csummary class="dr-r">\x3cspan>Saldo en Caja y Bancos \x3cem>▾ ver\x3c/em>\x3c/span>\x3cb>' + M(caja) + '\x3c/b>\x3c/summary>\x3cdiv class="dr-m dr-bk">' + W.realCols.map(function (c, i) { return R.real.row.v[i] ? '\x3cdiv>\x3csmall>' + esc(c.name) + '\x3c/small>\x3cb>' + M(R.real.row.v[i]) + '\x3c/b>\x3c/div>' : ''; }).join('') + '\x3c/div>\x3c/details>';
     else bancos = row('Saldo en Caja y Bancos', caja);
@@ -1689,14 +1718,14 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       row('Proveedores', g.prov[0], g.prov[1]) + row('Personal', g.pers[0], g.pers[1]) + row('Servicios (arriendos y serv. públicos)', g.serv[0], g.serv[1]) + row('Gastos varios', g.gast[0], g.gast[1]) + '\x3c/div>' +
       '\x3cdiv class="dr-c">' + band('(–) Impuestos', imp, 'no') + (ik.length ? mini(ik.map(function (k) { return [k, im[k]]; })) : mini([['ICO', 0], ['Retención', 0], ['ICA', 0], ['IVA', 0]])) + '\x3c/div>' +
       '\x3cdiv class="dr-hero' + (real < 0 ? ' neg' : '') + '">\x3csmall>Disponible real\x3c/small>\x3cb>' + M(real) + '\x3c/b>\x3c/div>' +
-      '\x3cdiv class="dr-c">' + band('(+) Otras cuentas por cobrar', otras, 'ok') + mini([['Empleados', R.cxc.emp], ['Socios', R.cxc.soc], ['Otros', R.cxc.otr]]) +
+      '\x3cdiv class="dr-c">' + band('(+) Otras cuentas por cobrar', otras, 'ok') + cxcCeldas(R) + cxcPanel(R) +
       '\x3c/div>\x3cdiv class="dr-hero2' + (real + otras < 0 ? ' neg' : '') + '">\x3csmall>Disponible + cuentas por cobrar\x3c/small>\x3cb>' + M(real + otras) + '\x3c/b>\x3c/div>';
     if (doc) h += '\x3cp class="dr-n">' + doc.n + ' pagos autorizados · semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + (doc.fechaPago ? ' · pagos para el ' + F(doc.fechaPago, true) : '') + ' · autorizó ' + esc(doc.por || '') + ' · guardado ' + esc(stampLargo(doc.guardadoISO)) + (doc.retirados && doc.retirados.length ? ' · ' + doc.retirados.length + ' retiradas' : '') + '. Lo no autorizado no se descuenta.\x3c/p>';
     return h + '\x3c/section>';
   }
   function dispAjustar() {
     var el = document.getElementById('dr'); if (!el) return;
-    el.style.zoom = ''; var top = el.getBoundingClientRect().top, vh = window.innerHeight, nat = el.getBoundingClientRect().height, av = vh - top - 6;
+    el.style.zoom = ''; if (S.cxcSel) return; var top = el.getBoundingClientRect().top, vh = window.innerHeight, nat = el.getBoundingClientRect().height, av = vh - top - 6;
     if (nat > av && av > 200) el.style.zoom = Math.max(0.55, av / nat).toFixed(3);
   }
   function vAuthRep(doc, liveMap, admin) {
@@ -2179,6 +2208,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         ks.forEach(function (k) { if (on) delete O[k]; else O[k] = 1; }); render();
       };
     });
+    root.querySelectorAll('[data-cx]').forEach(function (b) { b.onclick = function () { S.cxcSel = S.cxcSel === b.dataset.cx ? null : b.dataset.cx; render(); }; });
     var rud = document.getElementById('r-undo'); if (rud) rud.onclick = function () { S.rOut = {}; render(); };
     var rpc = document.getElementById('r-proc'); if (rpc) rpc.onclick = repProcesar;
     var apd = root.querySelector('[data-apdf]'); if (apd) apd.onclick = function () { var dc = S.aDocs[iso(S.aWeek)]; if (dc) pdfEntregar(dc, false); };

@@ -1,8 +1,14 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 6.1
+  Flujo de Caja La Matriarca — versión 6.2
 
   HISTORIAL DE VERSIONES
+  v6.2 (6 oct 2026) — Aplicación de pagos: ahora salen los pagos programados de una vez.
+    · Se quitó la pantalla “Falta un paso”. Al entrar se ve la programación
+      autorizada con los pagos sin marcar, lista para Seleccionar todo y Procesar.
+    · Los pagos procesados quedan guardados para todos aunque no haya copia del Excel.
+    · Al Exportar, si la app no tiene la copia del archivo, pide escogerlo una sola vez
+      y le anota todos los pagos aplicados (fecha de pago, valor y caja/banco).
   v6.1 (6 oct 2026) — Módulo nuevo: Aplicación de pagos aprobados (contabilidad).
     · Trabaja con el Excel que YA está cargado en la app; no se vuelve a subir.
       Muestra la programación autorizada de la semana con los pagos SIN marcar.
@@ -297,7 +303,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="6.1">
+<meta name="version" content="6.2">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -314,7 +320,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "6.1";
+window.MX_VERSION = "6.2";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -2489,15 +2495,16 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     gast: { n: 'GASTOS_VARIOS', f: 'B', v: 'I', b: 'G', s: 'L' },
     obl: { n: 'OBLIGACIONES_FINANCIERAS', f: 'J', v: 'K', b: 'L', s: 'M', est: '✅ Pagada' }
   };
-  function apUsar(name, buf, cargado) { S.ap = { name: name, buf: buf, cargado: cargado || W.cargado, msg: null }; S.apEst = 'ok'; S.apSel = S.apSel || {}; }
+  function apUsar(name, buf, cargado, nApl) { var o = S.ap || {}; S.ap = { name: name, buf: buf, cargado: cargado || W.cargado, msg: o.msg || null, banco: o.banco, nApl: nApl || 0 }; S.apEst = 'ok'; S.apSel = S.apSel || {}; }
+  function apLogN() { return (W.apLog || []).length; }
   /* El Excel que ya está subido: la copia del archivo se guarda junto con los datos (ver gate.js, MX_XLS) */
   function apCargar() {
     if (S.apEst === 'cargando') return;
     S.apEst = 'cargando';
-    if (window.MX_LASTXLS && window.MX_LASTXLS.name === W.archivoNombre) { apUsar(W.archivoNombre, window.MX_LASTXLS.buf, W.cargado); return; }
+    if (window.MX_LASTXLS && window.MX_LASTXLS.name === W.archivoNombre) { apUsar(W.archivoNombre, window.MX_LASTXLS.buf, W.cargado, 0); return; }
     if (!window.MX_XLS) { S.apEst = 'falta'; return; }
     window.MX_XLS.load().then(function (r) {
-      if (r && r.cargado === W.cargado) apUsar(r.name, r.buf, r.cargado); else S.apEst = 'falta';
+      if (r && r.cargado === W.cargado) apUsar(r.name, r.buf, r.cargado, apLogN()); else S.apEst = 'falta';
       render();
     }).catch(function () { S.apEst = 'falta'; render(); });
   }
@@ -2527,18 +2534,16 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   }
   function vAplic() {
     if (!(esAdminRol() || window.MX_ROLE === 'contable')) return '\x3cdiv class="panel empty">Este módulo es solo para contabilidad.\x3c/div>';
-    if (!S.ap && !S.apEst) apCargar();
+    if (!S.ap) S.ap = { name: W.archivoNombre || 'Excel', buf: null, cargado: W.cargado, msg: null, nApl: 0 };
+    if (!S.apSel) S.apSel = {};
+    if (!S.apEst) apCargar();
     var A = S.ap, hoy = hoyS();
     var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Aplicación de pagos aprobados\x3c/h2>\x3cspan class="meta">Marque lo que ya se pagó, procese y exporte el Excel actualizado\x3c/span>\x3c/div>\x3c/div>';
-    if (!A) {
-      if (S.apEst === 'falta') return h + '\x3cdiv class="panel" style="padding:16px">\x3cp class="note" style="margin:0 0 12px">\x3cb>Falta un paso, una sola vez.\x3c/b> Para poder entregarle el Excel actualizado, la app necesita guardar una copia del archivo. Entre a \x3cb>Flujo de caja\x3c/b>, toque \x3cb>Cargar Excel\x3c/b>, escoja el archivo de hoy y toque \x3cb>Guardar\x3c/b>. Después vuelva aquí.\x3c/p>\x3cbutton class="btn pri" id="ap-ir">Ir a Flujo de caja\x3c/button>\x3c/div>';
-      return h + '\x3cdiv class="panel empty">Preparando el Excel…\x3c/div>';
-    }
     var L = S.aWeek == null ? (S.aWeek = MX.lunesDe(authD())) : S.aWeek, hoyL = MX.lunesDe(authD());
     aLoad(L);
-    h += '\x3cdiv class="banner">\x3cspan>\x3cb>Excel en uso:\x3c/b> ' + esc(A.name) + '\x3cbr>\x3cspan class="meta">Informe del ' + F(W.fechaInforme, true) + (W.aplicado ? ' · ' + W.aplicado + ' pagos aplicados desde la última carga' : '') + '\x3c/span>\x3c/span>\x3c/div>';
+    h += '\x3cdiv class="banner">\x3cspan>\x3cb>Excel:\x3c/b> ' + esc(W.archivoNombre || A.name) + '\x3cbr>\x3cspan class="meta">Informe del ' + F(W.fechaInforme, true) + (W.aplicado ? ' · ' + W.aplicado + ' pagos aplicados desde la última carga' : '') + '\x3c/span>\x3c/span>\x3c/div>';
     if (A.msg) h += '\x3cdiv class="banner" style="background:#e8f3ec">\x3cspan>' + A.msg + '\x3c/span>\x3c/div>';
-    if (W.aplicado) h += '\x3cdiv class="panel" style="padding:14px">\x3cp class="note" style="margin:0 0 10px">\x3cb>Exportar el Excel con los pagos aplicados\x3c/b>\x3cbr>' + esc(A.name) + '\x3c/p>\x3cbutton class="btn pri" id="ap-dl">Exportar Excel\x3c/button>\x3cp class="meta" style="margin:10px 0 0">Ábralo en Excel y guárdelo una vez para que se recalculen las fórmulas. Puede exportar cuando termine de aplicar todos los pagos del día; el archivo siempre trae lo último aplicado.\x3c/p>\x3c/div>';
+    if (apLogN() || W.aplicado) h += '\x3cdiv class="panel" style="padding:14px">\x3cp class="note" style="margin:0 0 10px">\x3cb>Exportar el Excel con los pagos aplicados\x3c/b>\x3cbr>' + esc(W.archivoNombre || A.name) + '\x3c/p>\x3cbutton class="btn pri" id="ap-dl">Exportar Excel\x3c/button>\x3cinput type="file" id="ap-file" accept=".xlsx" style="display:none">\x3cp class="meta" style="margin:10px 0 0">' + (A.buf ? 'Ábralo en Excel y guárdelo una vez para que se recalculen las fórmulas. Puede exportar cuando termine de aplicar todos los pagos del día; el archivo siempre trae lo último aplicado.' : 'Al exportar, la app le pedirá escoger una vez el Excel original; le anota todos los pagos aplicados y lo descarga con el número de Round siguiente.') + '\x3c/p>\x3c/div>';
     h += '\x3cdiv class="weeknav">\x3cbutton class="btn" id="a-prev" aria-label="Semana anterior">‹ Anterior\x3c/button>\x3cdiv class="weeknav-t">\x3csmall>' + (L === hoyL ? 'Semana actual' : 'Semana') + '\x3c/small>\x3cb>Lun ' + F(L) + ' – dom ' + F(L + 6) + '\x3c/b>\x3c/div>\x3cbutton class="btn" id="a-next" aria-label="Semana siguiente">Siguiente ›\x3c/button>\x3c/div>';
     var R = apItems(), doc = R.doc;
     if (doc === undefined) return h + '\x3cdiv class="panel empty">Cargando la autorización de esta semana…\x3c/div>';
@@ -2638,41 +2643,65 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       return chain.then(function () { return zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' }); });
     });
   }
+  /* aplica al archivo los lotes del registro (W.apLog) que todavía no están en él */
+  function apReplay(buf, desde) {
+    var log = (W.apLog || []).slice(desde || 0), p = Promise.resolve(buf);
+    log.forEach(function (b) { p = p.then(function (cur) { return apAplicarXlsx(cur, b.plan, b.fecha, b.banco); }); });
+    return p;
+  }
   function apProcesar() {
     var A = S.ap; if (!A) return;
     var R = apItems(), items = R.items, dest = apSync(items), sel = items.filter(function (i) { return S.apSel[i.k]; });
     if (!sel.length) return;
     var banco = A.banco; if (!banco) { alert('Escoja primero de qué caja o banco se pagó.'); return; }
     var hoy = hoyS(), npag = sel.filter(function (i) { return !i.nc; }).length, neto = sel.reduce(function (s, i) { return s + i.x.saldo; }, 0);
-    if (!confirm('¿Aplicar ' + npag + (npag === 1 ? ' pago' : ' pagos') + ' por ' + M(neto) + ' con fecha de pago ' + F(hoy, true) + ', pagados desde ' + banco + '?\n\nSe descargará una copia del Excel con esos pagos anotados. El Excel que usted subió no se modifica.')) return;
+    if (!confirm('¿Aplicar ' + npag + (npag === 1 ? ' pago' : ' pagos') + ' por ' + M(neto) + ' con fecha de pago ' + F(hoy, true) + ', pagados desde ' + banco + '?\n\nQuedan guardados para todos. El Excel que usted subió no se modifica; el Excel actualizado se exporta al final.')) return;
     var plan = [];
     sel.forEach(function (i) {
       var rows = {}; W.pay.forEach(function (p) { if (p.cat === i.x.cat) rows[p.row] = p; });
       i.x.filas.forEach(function (f) { var p = rows[f.row]; plan.push({ cat: i.x.cat, row: f.row, valor: Math.round(f.valor * 100) / 100, banco: p && p.banco ? p.banco : '' }); });
     });
     var b = document.getElementById('ap-proc'); if (b) { b.disabled = true; b.textContent = 'Procesando…'; }
-    apAplicarXlsx(A.buf, plan, hoy, banco).then(function (nb) {
-      var nombre = apSiguienteNombre(A.name), undo = [], antes = { aplicado: W.aplicado, nom: W.archivoNombre, med: W.excel ? W.excel.megaEnDisponible : null };
+    var logAntes = W.apLog ? W.apLog.slice() : null, nuevoLote = { fecha: hoy, banco: banco, plan: plan };
+    var pre = A.buf ? apReplay(A.buf, A.nApl).then(function (cur) { return apAplicarXlsx(cur, plan, hoy, banco); }) : Promise.resolve(null);
+    pre.then(function (nb) {
+      var nombre = apSiguienteNombre(W.archivoNombre || A.name), undo = [], antes = { aplicado: W.aplicado, nom: W.archivoNombre, med: W.excel ? W.excel.megaEnDisponible : null };
       plan.forEach(function (pl) { W.pay.forEach(function (p) { if (p.cat === pl.cat && p.row === pl.row) { undo.push([p, p.fPago, p.pagado, p.saldo, p.banco]); p.fPago = hoy; p.pagado = pl.valor; p.saldo = 0; if (!p.banco) p.banco = banco; } }); });
+      W.apLog = (W.apLog || []).concat([nuevoLote]);
       W.aplicado = (W.aplicado || 0) + npag; W.archivoNombre = nombre; if (W.excel) W.excel.megaEnDisponible = false;
-      function revertir() { undo.forEach(function (u) { u[0].fPago = u[1]; u[0].pagado = u[2]; u[0].saldo = u[3]; u[0].banco = u[4]; }); W.aplicado = antes.aplicado; W.archivoNombre = antes.nom; if (W.excel) W.excel.megaEnDisponible = antes.med; }
+      function revertir() { undo.forEach(function (u) { u[0].fPago = u[1]; u[0].pagado = u[2]; u[0].saldo = u[3]; u[0].banco = u[4]; }); W.aplicado = antes.aplicado; W.archivoNombre = antes.nom; if (W.excel) W.excel.megaEnDisponible = antes.med; if (logAntes) W.apLog = logAntes; else delete W.apLog; }
       var guardar = window.MX_SAVE ? window.MX_SAVE(W, nombre, nb) : Promise.reject(new Error('No se pudo guardar.'));
       return guardar.then(function () {
-        A.buf = nb; A.name = nombre; A.cargado = W.cargado;
+        if (nb) { A.buf = nb; A.nApl = apLogN(); }
+        A.name = nombre; A.cargado = W.cargado;
         sel.forEach(function (i) { delete S.apSel[i.k]; });
         A.msg = '\x3cb>Listo.\x3c/b> Se aplicaron ' + npag + (npag === 1 ? ' pago' : ' pagos') + ' por ' + M(neto) + ' con fecha ' + F(hoy, true) + '. Ya quedaron guardados para todos. Cuando termine, toque \x3cb>Exportar Excel\x3c/b>.';
         render(); window.scrollTo(0, 0);
       }, function (e) { revertir(); throw new Error('No se pudieron guardar los pagos aplicados (' + ((e && (e.message || e.code)) || 'error') + '). No se aplicó nada; intente de nuevo.'); });
     }).catch(function (e) { S.err = (e && e.message) || 'No se pudo procesar. Intente de nuevo.'; render(); });
   }
+  function apBajar(buf, name) {
+    var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), u = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = u; a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 4000);
+  }
   function apDescargar() {
     var A = S.ap; if (!A) return;
-    var blob = new Blob([A.buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), u = URL.createObjectURL(blob), a = document.createElement('a');
-    a.href = u; a.download = A.name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(u); a.remove(); }, 4000);
+    var nombre = W.archivoNombre || A.name;
+    if (A.buf) { apReplay(A.buf, A.nApl).then(function (nb) { A.buf = nb; A.nApl = apLogN(); apBajar(nb, nombre); }).catch(function (e) { S.err = (e && e.message) || 'No se pudo exportar.'; render(); }); return; }
+    var f = document.getElementById('ap-file'); if (f) f.click();
+  }
+  function apArchivoOriginal(file) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      apReplay(fr.result, 0).then(function (nb) { apBajar(nb, W.archivoNombre || file.name); }).catch(function (e) { S.err = (e && e.message) || 'No se pudo exportar. Escoja el Excel original.'; render(); });
+    };
+    fr.onerror = function () { S.err = 'No se pudo leer el archivo.'; render(); };
+    fr.readAsArrayBuffer(file);
   }
   function apBind() {
     var air = document.getElementById('ap-ir'); if (air) air.onclick = function () { if (window.MX_NAV) window.MX_NAV('caja'); };
     var dl = document.getElementById('ap-dl'); if (dl) dl.onclick = apDescargar;
+    var af = document.getElementById('ap-file'); if (af) af.onchange = function () { if (af.files && af.files[0]) apArchivoOriginal(af.files[0]); af.value = ''; };
     var bs = document.getElementById('ap-banco'); if (bs) bs.onchange = function () { if (S.ap) S.ap.banco = bs.value; render(); };
     var pr = document.getElementById('ap-proc'); if (pr) pr.onclick = apProcesar;
     var al = document.getElementById('ap-all'); if (al) al.onclick = function () { apItems().items.forEach(function (i) { if (!i.nc && !i.bloq) S.apSel[i.k] = 1; }); render(); };

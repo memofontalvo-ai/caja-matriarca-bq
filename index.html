@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 5.5
+  Flujo de Caja La Matriarca — versión 5.6
 
   HISTORIAL DE VERSIONES
+  v5.6 (6 oct 2026) — Botón “Eliminar esta autorización” (solo administrador).
+    · Borra el informe guardado de la semana y todo vuelve a como estaba antes
+      de autorizar. No toca el Excel. Pide confirmación.
   v5.5 (6 oct 2026) — Notas crédito descontadas por proveedor.
     · Las notas crédito pendientes del Excel (valores negativos) ahora salen
       en Pagos autorizados, dentro de cada proveedor, y se descuentan solas
@@ -259,7 +262,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="5.5">
+<meta name="version" content="5.6">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -276,7 +279,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "5.5";
+window.MX_VERSION = "5.6";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -725,6 +728,11 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 /* v5.5 notas crédito */
 .ckrow.nc{background:#EAF4EC;border-left:4px solid #1f7a4d}
 .ckrow.nc .ck-a{color:#1f7a4d}
+
+/* v5.6 eliminar autorización */
+.del-box{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+.btn.dng{background:#fff;color:#A33B2E;border:1.5px solid #A33B2E}
+.btn.dng:hover{background:#FBEDEA}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1372,6 +1380,15 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       S.err = (e && e.code === 'permission-denied') ? 'Su usuario no tiene permiso para modificar autorizaciones. Solo el administrador puede.' : 'No se pudo guardar el cambio: ' + (e && e.message || 'error'); render();
     });
   }
+  function autEliminar() {
+    var id = iso(S.aWeek), doc = S.aDocs[id];
+    if (!doc) return;
+    if (!confirm('¿Eliminar la autorización de la semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + '?\n\nSe borra el informe guardado (' + doc.n + (doc.n === 1 ? ' pago' : ' pagos') + ' · ' + M(doc.total) + ').\nLos datos del Excel no cambian y podrá volver a armar la autorización desde cero.\n\nEsto no se puede deshacer.')) return;
+    var b = document.querySelector('[data-adel]'); if (b) { b.disabled = true; b.textContent = 'Eliminando…'; }
+    window.MX_AUTH.del(id).then(function () { S.aDocs[id] = null; S.aSel = {}; S.aInit = null; S.aView = 'sel'; S.aRng = null; S.aHasta = null; S.rOut = {}; S.err = null; window.scrollTo(0, 0); render(); }).catch(function (e) {
+      S.err = (e && e.code === 'permission-denied') ? 'Su usuario no tiene permiso para eliminar autorizaciones. Solo el administrador puede.' : 'No se pudo eliminar: ' + (e && e.message || 'error'); render();
+    });
+  }
   function textoAut(doc) {
     var L = ['AUTORIZACIÓN DE PAGOS · La Matriarca', 'Semana: ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + MX.toJS(doc.lunes).getUTCFullYear(), doc.fechaPago ? 'Pagos para el ' + F(doc.fechaPago, true) : '', 'Autorizó: ' + (doc.por || '') + ' · ' + stampLargo(doc.guardadoISO), ''].filter(function (s, i) { return s !== '' || i === 4; });
     Object.keys(CATN).forEach(function (k) {
@@ -1914,7 +1931,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (admin && nOut) h += '\x3cdiv class="ck-bar no-print">\x3cdiv>\x3csmall>Se quitan ' + nOut + (nOut === 1 ? ' factura' : ' facturas') + ' (' + M(totOut) + ')\x3c/small>\x3cb>Nuevo total ' + M(totNew) + '\x3c/b>\x3c/div>\x3cspan>\x3cbutton class="btn" id="r-undo">Deshacer\x3c/button> \x3cbutton class="btn pri" id="r-proc">Procesar cambios\x3c/button>\x3c/span>\x3c/div>';
     if (pagadas) h += '\x3cp class="note no-print">' + pagadas + (pagadas === 1 ? ' pago autorizado ya no aparece' : ' pagos autorizados ya no aparecen') + ' como pendiente en el último Excel (' + M(pagadasT) + '): lo más probable es que ya se pagaron.\x3c/p>';
     h += '\x3cdiv class="rep-sign">\x3cdiv>Autorizó\x3c/div>\x3cdiv>Recibido contabilidad\x3c/div>\x3c/div>';
-    h += '\x3cdiv class="ck-share no-print">\x3cspan>\x3cbutton class="btn pri" data-apdf="1">Descargar PDF (tamaño carta)\x3c/button> \x3cbutton class="btn" data-aview="1">Ver PDF\x3c/button> \x3cbutton class="btn" data-ashare="1">Compartir como texto\x3c/button>\x3c/span>\x3cspan class="meta">El PDF trae una hoja por proveedor (con sus facturas y total) y al final el informe de todo lo que se paga.\x3c/span>\x3c/div>\x3c/section>';
+    h += '\x3cdiv class="ck-share no-print">\x3cspan>\x3cbutton class="btn pri" data-apdf="1">Descargar PDF (tamaño carta)\x3c/button> \x3cbutton class="btn" data-aview="1">Ver PDF\x3c/button> \x3cbutton class="btn" data-ashare="1">Compartir como texto\x3c/button>\x3c/span>\x3cspan class="meta">El PDF trae una hoja por proveedor (con sus facturas y total) y al final el informe de todo lo que se paga.\x3c/span>\x3c/div>' + (admin ? '\x3cdiv class="ck-share no-print del-box">\x3cbutton class="btn dng" data-adel="1">Eliminar esta autorización\x3c/button>\x3cspan class="meta">Borra el informe guardado de esta semana y deja todo como antes de autorizar. No toca el Excel.\x3c/span>\x3c/div>' : '') + '\x3c/section>';
     return h;
   }
   /* ---------- PROGRAMACIÓN DE PAGOS (por fecha de programación, lunes a domingo) ---------- */
@@ -2335,6 +2352,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var apv = document.getElementById('a-prev'); if (apv) apv.onclick = function () { S.aWeek -= 7; S.aInit = null; render(); };
     var anx = document.getElementById('a-next'); if (anx) anx.onclick = function () { S.aWeek += 7; S.aInit = null; render(); };
     var asv = document.getElementById('a-save'); if (asv) asv.onclick = autGuardar;
+    var adl = root.querySelector('[data-adel]'); if (adl) adl.onclick = autEliminar;
     root.querySelectorAll('[data-ropen]').forEach(function (b) { b.onclick = function () { var v = b.dataset.ropen === '1'; (S._rk || []).forEach(function (k) { S.open[k] = v; }); render(); }; });
     root.querySelectorAll('input.rck').forEach(function (c) {
       if (c.dataset.st === 'some') c.indeterminate = true;
@@ -3018,7 +3036,8 @@ if (typeof module !== 'undefined') module.exports = MX;
   Object.defineProperty(window, 'MX_USERNAME', { get: function () { return quien(); } });
   window.MX_AUTH = {
     get: function (id) { return db.collection('autorizaciones').doc(id).get().then(function (s) { return s.exists ? s.data() : null; }); },
-    save: function (id, data) { if (window.MX_ROLE !== 'admin') return Promise.reject({ code: 'permission-denied' }); return db.collection('autorizaciones').doc(id).set(data); }
+    save: function (id, data) { if (window.MX_ROLE !== 'admin') return Promise.reject({ code: 'permission-denied' }); return db.collection('autorizaciones').doc(id).set(data); },
+    del: function (id) { if (window.MX_ROLE !== 'admin') return Promise.reject({ code: 'permission-denied' }); return db.collection('autorizaciones').doc(id).delete(); }
   };
   window.MX_SAVE = function (W, archivo) {
     if (!puedeSubir()) return Promise.reject({ code: 'permission-denied' });

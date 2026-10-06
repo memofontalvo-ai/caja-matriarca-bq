@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 4.3
+  Flujo de Caja La Matriarca — versión 4.4
 
   HISTORIAL DE VERSIONES
+  v4.4 (5 oct 2026) — Disponible real: bloques separados y cifra grande.
+    · Cada bloque (bancos, pagos autorizados, impuestos, otras cuentas) va
+      en su propia tarjeta con espacio entre ellas.
+    · El DISPONIBLE REAL va en una tarjeta destacada con la cifra grande.
   v4.3 (5 oct 2026) — Disponible real: el encabezado dice "Informe para socios".
   v4.2 (5 oct 2026) — Leyenda en los pagos autorizados.
     · En Disponible real y en el informe guardado se aclara que la
@@ -210,7 +214,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="4.3">
+<meta name="version" content="4.4">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -227,7 +231,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "4.3";
+window.MX_VERSION = "4.4";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -622,6 +626,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .dr-bk{grid-auto-flow:row;grid-template-columns:repeat(3,1fr);grid-auto-columns:auto}
 .dr-n{margin:5px 2px 0;font-size:10px;color:var(--muted);line-height:1.25}
 .dr-l{padding:4px 10px;font-size:10.5px;font-style:italic;color:#6d1015;background:#fdecea;border-top:1px solid var(--line)}
+/* v4.4 bloques separados + disponible real grande */
+.dr-h{border-radius:12px;margin-bottom:8px}
+.dr-c{border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.dr-c>:first-child{border-top:0}
+.dr-r{padding:8px 12px;min-height:32px;font-size:13px}
+.dr-b{padding:8px 12px;min-height:34px}.dr-b b{font-size:15px}
+.dr-hero{background:linear-gradient(180deg,#2c7a4b,#1d5a37);color:#fff;border-radius:14px;margin-bottom:8px;padding:12px 12px 14px;text-align:center;box-shadow:0 3px 10px rgba(20,80,50,.3)}
+.dr-hero.neg{background:linear-gradient(180deg,#9c2027,#6d1015)}
+.dr-hero small{display:block;font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;opacity:.9}
+.dr-hero b{display:block;font-size:40px;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
+.dr-w{border-radius:10px;margin-bottom:8px}
+.dr-m>div{padding:7px 6px}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1575,13 +1591,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var h = '\x3csection class="dr" id="dr">\x3cdiv class="dr-h">\x3cdiv>\x3csmall>La Matriarca · Informe para socios\x3c/small>\x3ch2>Disponible real de efectivo\x3c/h2>\x3c/div>\x3cdiv class="dr-f">\x3csmall>Fecha del informe\x3c/small>\x3cb>' + F(S.D, true) + '\x3c/b>\x3c/div>\x3c/div>';
     if (cargando) h += '\x3cdiv class="dr-w">Leyendo la autorización guardada…\x3c/div>';
     else if (!doc) h += '\x3cdiv class="dr-w">Sin autorización guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + ': no se descuenta ningún pago.\x3c/div>';
-    h += '\x3cdiv class="dr-c">' + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') +
-      band('(–) Pagos autorizados', aut, 'no') +
+    h += '\x3cdiv class="dr-c">' + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') + '\x3c/div>' +
+      '\x3cdiv class="dr-c">' + band('(–) Pagos autorizados', aut, 'no') +
       '\x3cdiv class="dr-l">Contempla los pagos ya \x3cb>vencidos\x3c/b> y los \x3cb>próximos a vencer\x3c/b> en el transcurso de la semana en curso (' + F(L) + ' – ' + F(L + 6) + ').\x3c/div>' +
-      row('Proveedores', g.prov[0], g.prov[1]) + row('Personal', g.pers[0], g.pers[1]) + row('Servicios (arriendos y serv. públicos)', g.serv[0], g.serv[1]) + row('Gastos varios', g.gast[0], g.gast[1]) +
-      band('(–) Impuestos', imp, 'no') + (ik.length ? mini(ik.map(function (k) { return [k, im[k]]; })) : mini([['ICO', 0], ['Retención', 0], ['ICA', 0], ['IVA', 0]])) +
-      band('Disponible real', real, real < 0 ? 'neg' : 'ok') +
-      band('(+) Otras cuentas por cobrar', otras, 'ok') + mini([['Empleados', R.cxc.emp], ['Socios', R.cxc.soc], ['Otros', R.cxc.otr]]) +
+      row('Proveedores', g.prov[0], g.prov[1]) + row('Personal', g.pers[0], g.pers[1]) + row('Servicios (arriendos y serv. públicos)', g.serv[0], g.serv[1]) + row('Gastos varios', g.gast[0], g.gast[1]) + '\x3c/div>' +
+      '\x3cdiv class="dr-c">' + band('(–) Impuestos', imp, 'no') + (ik.length ? mini(ik.map(function (k) { return [k, im[k]]; })) : mini([['ICO', 0], ['Retención', 0], ['ICA', 0], ['IVA', 0]])) + '\x3c/div>' +
+      '\x3cdiv class="dr-hero' + (real < 0 ? ' neg' : '') + '">\x3csmall>Disponible real\x3c/small>\x3cb>' + M(real) + '\x3c/b>\x3c/div>' +
+      '\x3cdiv class="dr-c">' + band('(+) Otras cuentas por cobrar', otras, 'ok') + mini([['Empleados', R.cxc.emp], ['Socios', R.cxc.soc], ['Otros', R.cxc.otr]]) +
       '\x3cdiv class="dr-r tot">\x3cspan>Disponible si se cobran las otras cuentas\x3c/span>\x3cb>' + M(real + otras) + '\x3c/b>\x3c/div>\x3c/div>';
     if (doc) h += '\x3cp class="dr-n">' + doc.n + ' pagos autorizados · semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + (doc.fechaPago ? ' · pagos para el ' + F(doc.fechaPago, true) : '') + ' · autorizó ' + esc(doc.por || '') + ' · guardado ' + esc(stampLargo(doc.guardadoISO)) + (doc.retirados && doc.retirados.length ? ' · ' + doc.retirados.length + ' retiradas' : '') + '. Lo no autorizado no se descuenta.\x3c/p>';
     return h + '\x3c/section>';

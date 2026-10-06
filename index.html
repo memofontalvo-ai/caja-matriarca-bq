@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 5.6
+  Flujo de Caja La Matriarca — versión 5.7
 
   HISTORIAL DE VERSIONES
+  v5.7 (6 oct 2026) — La nota crédito (NC + n.º de factura) se liga a su factura.
+    · NC-1220450018 se descuenta de la factura 1220450018 del mismo proveedor:
+      sale justo debajo y la factura muestra “neto a pagar”.
+    · Se marca sola junto con su factura.
   v5.6 (6 oct 2026) — Botón “Eliminar esta autorización” (solo administrador).
     · Borra el informe guardado de la semana y todo vuelve a como estaba antes
       de autorizar. No toca el Excel. Pide confirmación.
@@ -262,7 +266,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="5.6">
+<meta name="version" content="5.7">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -279,7 +283,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "5.6";
+window.MX_VERSION = "5.7";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -733,6 +737,10 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .del-box{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
 .btn.dng{background:#fff;color:#A33B2E;border:1.5px solid #A33B2E}
 .btn.dng:hover{background:#FBEDEA}
+
+/* v5.7 NC ligada */
+.ncnet{color:#1f7a4d;font-weight:600}.ncnet b{color:#173D30}
+.ckrow.nc{margin-left:14px}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1345,13 +1353,26 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     else { corto = n === 0 ? 'Solo las que vencen hoy' : 'Sin vencidas · vencen hasta en ' + n + (n === 1 ? ' día' : ' días'); lim = 'vencen hasta el ' + F(D + n); }
     return { corto: corto, largo: corto + ' (' + lim + ')' + (sinV ? ' · ' + sinV + (sinV === 1 ? ' factura sin fecha de vencimiento' : ' facturas sin fecha de vencimiento') : ''), min: mn };
   }
+  /* v5.7 Notas crédito: NC-\x3cn.º de factura> se liga a esa factura del mismo proveedor */
+  function ncRefDe(x) { var m = String(x.factura || '').match(/^\s*NCE?[-\s]*(.+?)\s*$/i); return m ? m[1].toLowerCase() : null; }
+  function ncDest(xs) {
+    var idx = {}, out = {};
+    xs.forEach(function (x) { if (x.saldo >= 0 && x.factura != null) idx[x.cat + '|' + (x.tercero || '').toLowerCase() + '|' + String(x.factura).trim().toLowerCase()] = aKey(x); });
+    xs.forEach(function (x) { if (x.saldo < 0) { var r = ncRefDe(x); out[aKey(x)] = r && idx[x.cat + '|' + (x.tercero || '').toLowerCase() + '|' + r] || null; } });
+    return out;
+  }
+  function syncNC(xs) {
+    var dest = ncDest(xs), tiene = {};
+    xs.forEach(function (x) { if (x.saldo >= 0 && S.aSel[aKey(x)]) tiene[x.cat + '|' + (x.tercero || '').toLowerCase()] = 1; });
+    xs.forEach(function (x) { if (x.saldo < 0) { var k = aKey(x), t = dest[k]; if (t ? S.aSel[t] : tiene[x.cat + '|' + (x.tercero || '').toLowerCase()]) S.aSel[k] = 1; else delete S.aSel[k]; } });
+    return dest;
+  }
   function rangoDoc(doc) { if (doc.rango) return doc.rango; var r = rangoAut((doc.items || []).map(function (x) { return x.dias; }), doc.fechaInforme || authD()); return r ? r.largo : ''; }
   function autGuardar() {
     var D = authD(), plazo = +S.gPlazo || 0, L = S.aWeek, id = iso(L), prev = S.aDocs[id] || null;
     var live = pendArm(), liveMap = {}; live.forEach(function (x) { liveMap[aKey(x)] = x; });
     var items = [];
-    var tn = {}; live.forEach(function (x) { if (x.saldo >= 0 && S.aSel[aKey(x)]) tn[x.cat + '|' + (x.tercero || '').toLowerCase()] = 1; });
-    live.forEach(function (x) { if (x.saldo < 0) { if (tn[x.cat + '|' + (x.tercero || '').toLowerCase()]) S.aSel[aKey(x)] = 1; else delete S.aSel[aKey(x)]; } });
+    syncNC(live);
     live.forEach(function (x) { var k = aKey(x); if (!S.aSel[k]) return; var v = x.saldo < 0 ? null : venceDe(x, plazo); items.push({ k: k, cat: x.cat, tercero: x.tercero, factura: x.factura || '', concepto: x.concepto || '', sub: x.sub || '', fDoc: x.fDoc || null, fProg: x.fProg || null, venc: v, dias: v != null ? D - v : null, saldo: Math.round(x.saldo), valor: Math.round(x.valor) }); });
     if (prev) prev.items.forEach(function (it) { if (!liveMap[it.k] && S.aSel[it.k]) items.push(it); });
     var ord = { prov: 0, serv: 1, pers: 2, gast: 3 }; items.sort(function (a, b) { return ord[a.cat] - ord[b.cat] || (b.dias == null ? -9999 : b.dias) - (a.dias == null ? -9999 : a.dias); });
@@ -1425,7 +1446,9 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (view === 'rep') return h + vAuthRep(doc, liveMap, admin);
     // ---- Autorizar ----
     var items = live.map(function (x) { var nc = x.saldo < 0, v = nc ? null : venceDe(x, plazo); return { x: x, k: aKey(x), v: v, d: v != null ? D - v : null, nc: nc }; });
-    (function () { var tiene = {}; items.forEach(function (i) { if (!i.nc && S.aSel[i.k]) tiene[i.x.cat + '|' + (i.x.tercero || '').toLowerCase()] = 1; }); items.forEach(function (i) { if (i.nc) { if (tiene[i.x.cat + '|' + (i.x.tercero || '').toLowerCase()]) S.aSel[i.k] = 1; else delete S.aSel[i.k]; } }); })();
+    var ncDst = syncNC(live), ncOf = {}, ncByK = {};
+    items.forEach(function (i) { ncByK[i.k] = i; });
+    items.forEach(function (i) { if (i.nc && ncDst[i.k] && ncByK[ncDst[i.k]]) { (ncOf[ncDst[i.k]] = ncOf[ncDst[i.k]] || []).push(i); i.ligada = true; } });
     var keep = doc ? doc.items.filter(function (it) { return !liveMap[it.k]; }) : [];
     var sel = items.filter(function (i) { return S.aSel[i.k]; });
     function suma(a) { return a.reduce(function (s, i) { return s + i.x.saldo; }, 0); }
@@ -1497,11 +1520,11 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
           return '\x3cdetails class="party' + (nv ? ' pv' : '') + '" data-k="' + esc(key) + '"' + (abierto ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot">' + M(t.saldo) + '\x3c/span>' +
             '\x3cspan class="sub">' + (nv ? chip('rojo', nv + (nv === 1 ? ' vencida' : ' vencidas')) : chip('verde', 'Al día')) + '\x3cspan>' + (function () { var nn = t.items.filter(function (i) { return i.nc; }).length, nf = t.items.length - nn; return nf + (nf === 1 ? ' factura' : ' facturas') + (nn ? ' + ' + nn + (nn === 1 ? ' nota crédito' : ' notas crédito') : ''); })() + '\x3c/span>' + (ns ? '\x3cspan>\x3cb>' + ns + ' marcadas\x3c/b>\x3c/span>' : '') + '\x3c/span>\x3c/summary>' +
             '\x3cdiv class="ckl">\x3cdiv class="ck-tools" style="padding:8px 14px;border-top:1px solid var(--line)">\x3cspan class="meta">' + esc(t.name) + '\x3c/span>\x3cbutton class="btn" data-pall="' + pi + '">' + (ns === t.items.length ? 'Quitar marcas' : 'Marcar todas') + '\x3c/button>\x3c/div>' +
-            ordItems(t.items).map(function (i) {
+            (function () { var base = ordItems(t.items.filter(function (i) { return !i.ligada; })), rows = []; base.forEach(function (i) { rows.push(i); (ncOf[i.k] || []).forEach(function (n) { rows.push(n); }); }); return rows; })().map(function (i) {
               var x = i.x, on = !!S.aSel[i.k];
-              var l2 = i.nc ? ['Nota crédito' + (x.fDoc ? ' del ' + F(x.fDoc) : ''), 'se descuenta sola del total de este proveedor'].join(' · ') : [x.fDoc ? 'Factura ' + F(x.fDoc) + ' (hace ' + (D - x.fDoc) + ' d)' : '', i.v != null ? 'Vence ' + F(i.v) : '', x.fProg ? 'Programada ' + F(x.fProg) + (x.fProg < D ? ' · ' + (D - x.fProg) + ' d de atraso' : '') : 'Sin programar'].filter(Boolean).join(' · ');
+              var l2 = i.nc ? ['Nota crédito' + (x.fDoc ? ' del ' + F(x.fDoc) : ''), ncDst[i.k] ? 'se descuenta de la factura ' + esc(String(ncByK[ncDst[i.k]].x.factura)) : 'se descuenta sola del total de este proveedor'].join(' · ') : [x.fDoc ? 'Factura ' + F(x.fDoc) + ' (hace ' + (D - x.fDoc) + ' d)' : '', i.v != null ? 'Vence ' + F(i.v) : '', x.fProg ? 'Programada ' + F(x.fProg) + (x.fProg < D ? ' · ' + (D - x.fProg) + ' d de atraso' : '') : 'Sin programar'].filter(Boolean).join(' · ');
               var cls = i.nc ? ' nc' : i.d != null && i.d > 0 ? ' venc' : (i.d != null && i.d >= -7 ? ' prox' : '');
-              return '\x3clabel class="ckrow' + cls + (on ? ' on' : '') + '">\x3cinput type="checkbox" data-ak="' + esc(i.k) + '"' + (on ? ' checked' : '') + (i.nc ? ' disabled' : '') + '>\x3cspan class="ck-b">\x3cb>' + esc(refDe(x)) + '\x3c/b>\x3cspan class="meta">' + CATN[x.cat] + (x.sub && x.cat !== 'pers' ? ' · ' + esc(x.sub) : '') + '\x3c/span>\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3cspan>' + (i.nc ? chip('verde', 'NOTA CRÉDITO · descuenta') : chipVi(i)) + (x.estado === 'abono' ? ' ' + chip('amarillo', 'Con abono') : '') + '\x3c/span>\x3c/span>\x3cspan class="ck-a">' + M(x.saldo) + '\x3c/span>\x3c/label>';
+              return '\x3clabel class="ckrow' + cls + (on ? ' on' : '') + '">\x3cinput type="checkbox" data-ak="' + esc(i.k) + '"' + (on ? ' checked' : '') + (i.nc ? ' disabled' : '') + '>\x3cspan class="ck-b">\x3cb>' + esc(refDe(x)) + '\x3c/b>\x3cspan class="meta">' + CATN[x.cat] + (x.sub && x.cat !== 'pers' ? ' · ' + esc(x.sub) : '') + '\x3c/span>\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3cspan>' + (i.nc ? chip('verde', 'NOTA CRÉDITO · descuenta') : chipVi(i)) + (x.estado === 'abono' ? ' ' + chip('amarillo', 'Con abono') : '') + '\x3c/span>' + (ncOf[i.k] ? '\x3cspan class="meta ncnet">Con nota crédito ' + M(ncOf[i.k].reduce(function (s2, n) { return s2 + n.x.saldo; }, 0)) + ' → neto a pagar \x3cb>' + M(x.saldo + ncOf[i.k].reduce(function (s2, n) { return s2 + n.x.saldo; }, 0)) + '\x3c/b>\x3c/span>' : '') + '\x3c/span>\x3cspan class="ck-a">' + M(x.saldo) + '\x3c/span>\x3c/label>';
             }).join('') + '\x3c/div>\x3c/details>';
         }).join('') + '\x3c/div>\x3c/details>';
     }).join('');

@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 4.7
+  Flujo de Caja La Matriarca — versión 4.8
 
   HISTORIAL DE VERSIONES
+  v4.8 (5 oct 2026) — Disponible real: nuevo título y cifras.
+    · "Disponible + cuentas por cobrar" va en tarjeta propia, resaltada y
+      con la cifra más grande. El Disponible real baja un poco de tamaño.
   v4.7 (5 oct 2026) — Nuevo diseño de la pantalla inicial.
     · Encabezado compacto con la misma imagen de La Matriarca / Tesorería
       (más pequeña y proporcionada), sobre verde oscuro.
@@ -230,7 +233,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="4.7">
+<meta name="version" content="4.8">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -247,7 +250,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "4.7";
+window.MX_VERSION = "4.8";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -665,6 +668,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .dr-hero{padding:8px 12px 10px}.dr-hero b{font-size:42px}.dr-hero small{font-size:13px}
 .dr-c,.dr-hero,.dr-h,.dr-w{margin-bottom:6px}
 .dr-n{font-size:11px}
+/* v4.8 disponible real un poco más pequeño; disponible + cuentas por cobrar destacado */
+.dr-hero{padding:6px 12px 8px}.dr-hero b{font-size:34px}.dr-hero small{font-size:12px}
+.dr-hero2{background:linear-gradient(180deg,#0f3a2b,#082A20);color:#F3D98B;border-radius:14px;margin-bottom:6px;padding:9px 12px 11px;text-align:center;border:2px solid #C9A35A;box-shadow:0 4px 12px rgba(8,42,32,.4)}
+.dr-hero2.neg{background:linear-gradient(180deg,#9c2027,#6d1015)}
+.dr-hero2 small{display:block;font-size:14px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;color:#FFF8E7}
+.dr-hero2 b{display:block;font-size:40px;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1681,7 +1690,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       '\x3cdiv class="dr-c">' + band('(–) Impuestos', imp, 'no') + (ik.length ? mini(ik.map(function (k) { return [k, im[k]]; })) : mini([['ICO', 0], ['Retención', 0], ['ICA', 0], ['IVA', 0]])) + '\x3c/div>' +
       '\x3cdiv class="dr-hero' + (real < 0 ? ' neg' : '') + '">\x3csmall>Disponible real\x3c/small>\x3cb>' + M(real) + '\x3c/b>\x3c/div>' +
       '\x3cdiv class="dr-c">' + band('(+) Otras cuentas por cobrar', otras, 'ok') + mini([['Empleados', R.cxc.emp], ['Socios', R.cxc.soc], ['Otros', R.cxc.otr]]) +
-      '\x3cdiv class="dr-r tot">\x3cspan>Disponible si se cobran las otras cuentas\x3c/span>\x3cb>' + M(real + otras) + '\x3c/b>\x3c/div>\x3c/div>';
+      '\x3c/div>\x3cdiv class="dr-hero2' + (real + otras < 0 ? ' neg' : '') + '">\x3csmall>Disponible + cuentas por cobrar\x3c/small>\x3cb>' + M(real + otras) + '\x3c/b>\x3c/div>';
     if (doc) h += '\x3cp class="dr-n">' + doc.n + ' pagos autorizados · semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + (doc.fechaPago ? ' · pagos para el ' + F(doc.fechaPago, true) : '') + ' · autorizó ' + esc(doc.por || '') + ' · guardado ' + esc(stampLargo(doc.guardadoISO)) + (doc.retirados && doc.retirados.length ? ' · ' + doc.retirados.length + ' retiradas' : '') + '. Lo no autorizado no se descuenta.\x3c/p>';
     return h + '\x3c/section>';
   }

@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 4.4
+  Flujo de Caja La Matriarca — versión 4.5
 
   HISTORIAL DE VERSIONES
+  v4.5 (5 oct 2026) — Disponible real: letra un poco más grande.
   v4.4 (5 oct 2026) — Disponible real: bloques separados y cifra grande.
     · Cada bloque (bancos, pagos autorizados, impuestos, otras cuentas) va
       en su propia tarjeta con espacio entre ellas.
@@ -214,7 +215,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="4.4">
+<meta name="version" content="4.5">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -231,7 +232,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "4.4";
+window.MX_VERSION = "4.5";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -638,6 +639,17 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .dr-hero b{display:block;font-size:40px;line-height:1.1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin-top:2px}
 .dr-w{border-radius:10px;margin-bottom:8px}
 .dr-m>div{padding:7px 6px}
+/* v4.5 letra un poco más grande, filas más ajustadas */
+.dr{font-size:14.5px}
+.dr-r{font-size:14.5px;padding:5px 12px;min-height:28px}
+.dr-r em{font-size:12px}
+.dr-b{padding:6px 12px;min-height:32px;font-size:15px}.dr-b b{font-size:17px}
+.dr-m small{font-size:11.5px}.dr-m b{font-size:14px}.dr-m>div{padding:4px 4px}
+.dr-l{font-size:11.5px;padding:3px 12px}
+.dr-h h2{font-size:17px}.dr-h small{font-size:10.5px}.dr-f b{font-size:14px}
+.dr-hero{padding:8px 12px 10px}.dr-hero b{font-size:42px}.dr-hero small{font-size:13px}
+.dr-c,.dr-hero,.dr-h,.dr-w{margin-bottom:6px}
+.dr-n{font-size:11px}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}

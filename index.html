@@ -1,8 +1,14 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 5.1
+  Flujo de Caja La Matriarca — versión 5.3
 
   HISTORIAL DE VERSIONES
+  v5.3 (6 oct 2026) — Encabezado de la pantalla inicial completo.
+    · La imagen ahora ocupa todo el ancho y se ve entera (logo, caja,
+      calculadora y gráficas), sin recortes en los lados.
+  v5.2 (5 oct 2026) — PDF de autorización mejor ordenado.
+    · Cada grupo (Proveedores, Servicios, Gastos varios, Personal) empieza
+      en hoja nueva; su resumen y su total quedan al final de ese grupo.
   v5.1 (5 oct 2026) — Imagen JPG: los textos ya no se cruzan.
     · La imagen mide cada texto con la letra del propio teléfono y lo
       ajusta (o lo recorta con …) para que nunca se monte sobre un valor.
@@ -244,7 +250,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="5.1">
+<meta name="version" content="5.3">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -261,7 +267,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "5.1";
+window.MX_VERSION = "5.3";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -797,15 +803,15 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 
 /* v4.7 Pantalla inicial (menú): encabezado compacto, fondo verde salvia y botones con relieve.
    Todo va dentro de .scr-menu para no afectar el ingreso ni las pantallas internas. */
-.scr.scr-menu{display:block;background:#B6C8AF;--hw:min(64vw,340px)}
-.scr-menu .mh{background:#073D2C;position:relative;box-shadow:0 4px 10px rgba(5,40,28,.35);z-index:2}
-.scr-menu .mh-img{position:relative;width:var(--hw);height:calc(var(--hw) * .78);margin:0 auto;padding:0;
-  background:var(--fondo-img) no-repeat;background-size:100% auto;background-position:0 calc(var(--hw) * -.118)}
+.scr.scr-menu{display:block;background:#B6C8AF;--hw:min(100vw,440px)}
+.scr-menu .mh{background:#0D3123;position:relative;box-shadow:0 4px 10px rgba(5,40,28,.35);z-index:2}
+.scr-menu .mh-img{position:relative;width:var(--hw);height:calc(var(--hw) * .79);margin:0 auto;padding:0;
+  background:var(--fondo-img) no-repeat;background-size:100% auto;background-position:0 calc(var(--hw) * -.108)}
 .scr-menu .mh-img::before,.scr-menu .mh-img::after{content:'';position:absolute;pointer-events:none}
 .scr-menu .mh-img::before{inset:0;background:
-  linear-gradient(90deg,#073D2C 0,rgba(7,61,44,0) 22%,rgba(7,61,44,0) 78%,#073D2C 100%),
-  linear-gradient(180deg,#073D2C 0,rgba(7,61,44,0) 9%,rgba(7,61,44,0) 90%,#073D2C 100%)}
-.scr-menu .mh-body{position:relative;isolation:isolate;min-height:calc(100dvh - var(--hw) * .78)}
+  linear-gradient(90deg,#0D3123 0,rgba(13,49,35,0) 4%,rgba(13,49,35,0) 96%,#0D3123 100%),
+  linear-gradient(180deg,#0D3123 0,rgba(13,49,35,0) 5%,rgba(13,49,35,0) 94%,#0D3123 100%)}
+.scr-menu .mh-body{position:relative;isolation:isolate;min-height:calc(100dvh - var(--hw) * .79)}
 .scr-menu .mh-body::before{content:'';position:absolute;inset:0;z-index:-1;background:
   linear-gradient(118deg,transparent 0 30%,rgba(199,169,105,.16) 30.2%,transparent 31% 100%),
   linear-gradient(62deg,transparent 0 58%,rgba(199,169,105,.12) 58.2%,transparent 59% 100%),
@@ -1557,7 +1563,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       var t0 = g.lst[0], n0 = t0.rows.length, ini = 19 + 12 + 14 + t0.rows[0].h + (n0 > 1 ? t0.rows[1].h : 0) + (n0 <= 2 ? 15 + (g.lst.length === 1 ? 21 : 0) : 0);
       if (g.compact) ini = 19 + 22 + (g.lst.length === 1 ? 21 : 0);
       if (!P) nuevaHoja(false, 'Relación de pagos autorizados', true), hojas.push(P);
-      else if (g.k === 'pers' || prevPers || y + 6 + ini > LIM) nuevaHoja(false, 'Relación de pagos autorizados', true), hojas.push(P);
+      else if (true) nuevaHoja(false, 'Relación de pagos autorizados', true), hojas.push(P);
       else y += 6;
       banda(g, false);
       g.lst.forEach(function (t, ti) {

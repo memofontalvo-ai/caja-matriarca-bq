@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 5.0
+  Flujo de Caja La Matriarca — versión 5.1
 
   HISTORIAL DE VERSIONES
+  v5.1 (5 oct 2026) — Imagen JPG: los textos ya no se cruzan.
+    · La imagen mide cada texto con la letra del propio teléfono y lo
+      ajusta (o lo recorta con …) para que nunca se monte sobre un valor.
   v5.0 (5 oct 2026) — Disponible real: imagen JPG para compartir.
     · Botón "Descargar informe (imagen JPG)": baja una imagen del informe
       tal como se ve en el celular. Botón "Compartir" para enviarla directo.
@@ -241,7 +244,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="5.0">
+<meta name="version" content="5.1">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -258,7 +261,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "5.0";
+window.MX_VERSION = "5.1";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1741,17 +1744,29 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     function draw(c, H) {
       c.fillStyle = '#F2F3EF'; c.fillRect(0, 0, W, H);
       var y = 12;
-      function T(t, x, yy, size, wt, col, al) { c.font = wt + ' ' + size + 'px ' + FF; c.fillStyle = col; c.textAlign = al || 'left'; c.textBaseline = 'middle'; c.fillText(t, x, yy); }
+      function T(t, x, yy, size, wt, col, al) { c.font = wt + ' ' + size + 'px ' + FF; c.fillStyle = col; c.textAlign = al || 'left'; c.textBaseline = 'middle'; c.fillText(t, x, yy); return c.measureText(t).width; }
+      function TW(t, size, wt) { c.font = wt + ' ' + size + 'px ' + FF; return c.measureText(t).width; }
+      /* Texto que se ajusta al ancho disponible (mide con la letra real del teléfono): reduce el tamaño y, si aún no cabe, recorta con … */
+      function TF(t, x, yy, size, wt, col, al, maxW, minS) {
+        var sz = size; t = String(t);
+        while (sz > (minS || 10) && TW(t, sz, wt) > maxW) sz -= .5;
+        if (TW(t, sz, wt) > maxW) { while (t.length > 1 && TW(t + '…', sz, wt) > maxW) t = t.slice(0, -1); t += '…'; }
+        return T(t, x, yy, sz, wt, col, al);
+      }
       function card(h, fn) { c.save(); rr(c, P, y, IW, h, 12); c.fillStyle = '#fff'; c.fill(); c.clip(); fn(); c.restore(); c.save(); rr(c, P + .5, y + .5, IW - 1, h - 1, 12); c.strokeStyle = '#dfe3dc'; c.lineWidth = 1; c.stroke(); c.restore(); }
-      function band(yy, h, col, l, v) { c.fillStyle = col; c.fillRect(P, yy, IW, h); T(l, P + 12, yy + h / 2 + 1, 15, 800, '#fff'); T(v, P + IW - 12, yy + h / 2 + 1, 17, 800, '#fff', 'right'); }
+      function band(yy, h, col, l, v) { c.fillStyle = col; c.fillRect(P, yy, IW, h); var wv = TF(v, P + IW - 12, yy + h / 2 + 1, 17, 800, '#fff', 'right', IW - 24 - 90, 12); TF(l, P + 12, yy + h / 2 + 1, 15, 800, '#fff', 'left', IW - 24 - wv - 14, 11); }
       function sep(yy) { c.fillStyle = '#e3e6e0'; c.fillRect(P, yy, IW, 1); }
-      function rowT(yy, h, l, n, v) { T(l, P + 12, yy + h / 2, 14.5, 400, '#14231B'); if (n != null) { c.font = '400 14.5px ' + FF; var w0 = c.measureText(l).width; T('(' + n + ')', P + 12 + w0 + 6, yy + h / 2 + 1, 12, 400, '#6b756e'); } T(v, P + IW - 12, yy + h / 2, 14.5, 800, '#14231B', 'right'); }
-      function mini(yy, h, items) { var cw = IW / items.length; items.forEach(function (it, i) { if (i) { c.fillStyle = '#e3e6e0'; c.fillRect(P + i * cw, yy, 1, h); } T(it[0], P + i * cw + cw / 2, yy + 13, 11.5, 400, '#6b756e', 'center'); T(M(it[1]), P + i * cw + cw / 2, yy + 31, 14, 800, '#14231B', 'center'); }); }
+      function rowT(yy, h, l, n, v) {
+        var wv = TF(v, P + IW - 12, yy + h / 2, 14.5, 800, '#14231B', 'right', IW - 24 - 80, 11), cnt = n != null ? '(' + n + ')' : '', wc = cnt ? TW(cnt, 12, 400) + 6 : 0;
+        var wl = TF(l, P + 12, yy + h / 2, 14.5, 400, '#14231B', 'left', IW - 24 - wv - 14 - wc, 10.5);
+        if (cnt) T(cnt, P + 12 + wl + 6, yy + h / 2 + 1, 12, 400, '#6b756e');
+      }
+      function mini(yy, h, items) { var cw = IW / items.length; items.forEach(function (it, i) { if (i) { c.fillStyle = '#e3e6e0'; c.fillRect(P + i * cw, yy, 1, h); } TF(it[0], P + i * cw + cw / 2, yy + 13, 11.5, 400, '#6b756e', 'center', cw - 10, 9); TF(M(it[1]), P + i * cw + cw / 2, yy + 31, 14, 800, '#14231B', 'center', cw - 10, 9); }); }
       // encabezado
       rr(c, P, y, IW, 58, 12); c.fillStyle = '#151f1a'; c.fill();
-      T('LA MATRIARCA · INFORME PARA SOCIOS', P + 12, y + 17, 10, 700, '#aab5ae');
-      T('Disponible real de efectivo', P + 12, y + 40, 17, 800, '#fff');
-      T('FECHA DEL INFORME', P + IW - 12, y + 17, 9.5, 700, '#aab5ae', 'right'); T(m.fecha, P + IW - 12, y + 40, 14, 800, '#fff', 'right');
+      var wd = TF(m.fecha, P + IW - 12, y + 40, 14, 800, '#fff', 'right', 150, 10); TF('FECHA DEL INFORME', P + IW - 12, y + 17, 9.5, 700, '#aab5ae', 'right', 150, 8);
+      TF('LA MATRIARCA · INFORME PARA SOCIOS', P + 12, y + 17, 10, 700, '#aab5ae', 'left', IW - 24 - 150, 8);
+      TF('Disponible real de efectivo', P + 12, y + 40, 17, 800, '#fff', 'left', IW - 24 - wd - 12, 11);
       y += 58 + 8;
       // bancos
       card(30 + 30 + 34, function () { rowT(y, 30, 'Saldo en Caja y Bancos', null, M(m.caja)); sep(y + 30); rowT(y + 30, 30, 'Caja MEGAMAS', null, M(m.mega)); band(y + 60, 34, '#245a3a', 'Total disponible', M(m.total)); });
@@ -1771,7 +1786,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       y += 76 + 8;
       // disponible real
       var neg = m.real < 0; rr(c, P, y, IW, 76, 14); var g1 = c.createLinearGradient(0, y, 0, y + 76); g1.addColorStop(0, neg ? '#9c2027' : '#2c7a4b'); g1.addColorStop(1, neg ? '#6d1015' : '#1d5a37'); c.fillStyle = g1; c.fill();
-      T('DISPONIBLE REAL', W / 2, y + 17, 12.5, 800, 'rgba(255,255,255,.9)', 'center'); T(M(m.real), W / 2, y + 46, 36, 800, '#fff', 'center');
+      T('DISPONIBLE REAL', W / 2, y + 17, 12.5, 800, 'rgba(255,255,255,.9)', 'center'); TF(M(m.real), W / 2, y + 46, 36, 800, '#fff', 'center', IW - 24, 20);
       y += 76 + 8;
       // otras cuentas
       card(34 + 42, function () { band(y, 34, '#245a3a', '(+) Otras cuentas por cobrar', M(m.otras)); mini(y + 34, 42, [['Empleados', m.cxc.emp], ['Socios', m.cxc.soc], ['Otros', m.cxc.otr]]); });
@@ -1779,7 +1794,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       // disponible real + cuentas por cobrar
       var v2 = m.real + m.otras; rr(c, P, y, IW, 84, 14); var g2 = c.createLinearGradient(0, y, 0, y + 84); g2.addColorStop(0, v2 < 0 ? '#9c2027' : '#0f3a2b'); g2.addColorStop(1, v2 < 0 ? '#6d1015' : '#082A20'); c.fillStyle = g2; c.fill(); rr(c, P + 1, y + 1, IW - 2, 82, 13); c.strokeStyle = '#C9A35A'; c.lineWidth = 2; c.stroke();
       var tt = 'DISPONIBLE REAL + CUENTAS POR COBRAR', fs = 14; c.font = '800 ' + fs + 'px ' + FF; while (c.measureText(tt).width > IW - 20 && fs > 9) { fs -= .5; c.font = '800 ' + fs + 'px ' + FF; }
-      T(tt, W / 2, y + 18, fs, 800, '#FFF8E7', 'center'); T(M(v2), W / 2, y + 52, 40, 800, '#F3D98B', 'center');
+      T(tt, W / 2, y + 18, fs, 800, '#FFF8E7', 'center'); TF(M(v2), W / 2, y + 52, 40, 800, '#F3D98B', 'center', IW - 24, 22);
       y += 84 + 8;
       // nota
       c.font = '400 10.5px ' + FF; var nl = wrap(c, m.nota, IW - 4); nl.forEach(function (l, i) { T(l, P + 2, y + 8 + i * 14, 10.5, 400, '#6b756e'); });

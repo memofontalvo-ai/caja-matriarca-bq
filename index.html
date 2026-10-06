@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 5.7
+  Flujo de Caja La Matriarca — versión 5.8
 
   HISTORIAL DE VERSIONES
+  v5.8 (6 oct 2026) — Vencimiento real de proveedores desde el Excel.
+    · Lee las columnas nuevas “Días de plazo” y “Fecha vencimiento” de la hoja
+      Proveedores (al final de la tabla). Si el Excel las trae, ya no usa el
+      plazo estimado; se oculta el selector de plazo.
   v5.7 (6 oct 2026) — La nota crédito (NC + n.º de factura) se liga a su factura.
     · NC-1220450018 se descuenta de la factura 1220450018 del mismo proveedor:
       sale justo debajo y la factura muestra “neto a pagar”.
@@ -266,7 +270,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="5.7">
+<meta name="version" content="5.8">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -283,7 +287,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "5.7";
+window.MX_VERSION = "5.8";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1461,11 +1465,11 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       body: [['venc', 'Vencidas', venc], ['prox', 'Vencen en 7 días o menos', prox], ['mas', 'Vencen después', mas], ['sinv', 'Sin fecha de vencimiento', sinv]].concat(ncs.length ? [['nc', 'Notas crédito (se descuentan)', ncs]] : []).map(function (r) {
         return '\x3cbutton class="row row-btn row-2' + (S.gF === r[0] ? ' on' : '') + '" data-gf="' + r[0] + '">\x3cspan>' + r[1] + ' ›\x3csmall>' + (r[0] === 'nc' ? r[2].length + (r[2].length === 1 ? ' nota crédito' : ' notas crédito') : nD(r[2].length).replace('pago', 'factura')) + (r[0] === 'venc' && r[2].length ? ' · la más vieja ' + Math.max.apply(null, r[2].map(function (i) { return i.d; })) + ' días' : '') + '\x3c/small>\x3c/span>' + amt(suma(r[2])) + '\x3c/button>';
       }).join(''), totalLbl: 'Total pendiente', total: suma(items) });
-    h += '\x3csection class="sec" id="detalle">\x3cdiv class="sec-head">\x3ch2>Facturas pendientes\x3c/h2>\x3cspan class="meta">' + (plazo ? 'Proveedores vencen a ' + plazo + ' días de la factura' : 'Proveedores: vencen el día de la factura') + '\x3c/span>\x3c/div>\x3cdiv class="filters">' +
+    h += '\x3csection class="sec" id="detalle">\x3cdiv class="sec-head">\x3ch2>Facturas pendientes\x3c/h2>\x3cspan class="meta">' + (W.vencProv ? 'Proveedores: vencimiento según el Excel (fecha de compra + días de plazo)' : plazo ? 'Proveedores vencen a ' + plazo + ' días de la factura (estimado)' : 'Proveedores: vencen el día de la factura') + '\x3c/span>\x3c/div>\x3cdiv class="filters">' +
       seg('gF', [['all', 'Todas'], ['marc', 'Solo marcadas'], ['venc', 'Vencidas'], ['prox', 'Por vencer'], ['sinp', 'Sin programar']]) +
       seg('gCat', [['all', 'Todo'], ['prov', 'Proveedores'], ['serv', 'Servicios'], ['pers', 'Personal'], ['gast', 'Gastos']]) +
       seg('gOrd', [['venc', 'Más vencidas'], ['valor', 'Mayor valor'], ['nom', 'A–Z']]) +
-      '\x3cdiv class="pick">\x3clabel>Plazo\x3c/label>' + seg('gPlazo', [['0', 'Contado'], ['15', '15 d'], ['30', '30 d'], ['45', '45 d'], ['60', '60 d']]) + '\x3c/div>' +
+      (W.vencProv ? '' : '\x3cdiv class="pick">\x3clabel>Plazo\x3c/label>' + seg('gPlazo', [['0', 'Contado'], ['15', '15 d'], ['30', '30 d'], ['45', '45 d'], ['60', '60 d']]) + '\x3c/div>') +
       '\x3cinput class="search" id="q" type="search" placeholder="Buscar proveedor o factura…" value="' + esc(S.q) + '">\x3c/div>';
     var q = S.q.toLowerCase();
     var ff = items.filter(function (i) {
@@ -2521,7 +2525,8 @@ var MX = (function () {
     // Anexos de pagos
     W.pay = [];
     function pushPay(o) { if (!o.tercero && !o.valor && !o.pagado) return; W.pay.push(o); }
-    rows('PROVEEDORES', 5, 5000, function (g, r) { pushPay({ cat: 'prov', row: r, fDoc: dte(g('A')), fProg: dte(g('B')), fPago: dte(g('C')), tercero: str(g('D')), nit: str(g('E')), factura: str(g('I')), concepto: str(g('J')), sub: str(g('L')), tipo: str(g('K')), valor: num(g('S')), pagado: num(g('T')), banco: str(g('U')), obs: str(g('V')), punto: str(g('W')), saldo: num(g('X')) }); });
+    W.vencProv = /vencim/i.test(str(get('PROVEEDORES', 'Z4')));
+    rows('PROVEEDORES', 5, 5000, function (g, r) { pushPay({ cat: 'prov', row: r, fDoc: dte(g('A')), fProg: dte(g('B')), fPago: dte(g('C')), venc: W.vencProv ? dte(g('Z')) : null, plazo: W.vencProv ? num(g('Y')) : 0, tercero: str(g('D')), nit: str(g('E')), factura: str(g('I')), concepto: str(g('J')), sub: str(g('L')), tipo: str(g('K')), valor: num(g('S')), pagado: num(g('T')), banco: str(g('U')), obs: str(g('V')), punto: str(g('W')), saldo: num(g('X')) }); });
     rows('SERVICIOS', 5, 5000, function (g, r) { pushPay({ cat: 'serv', row: r, fDoc: dte(g('A')), fProg: dte(g('B')), fPago: dte(g('C')), tercero: str(g('E')), sub: str(g('D')), concepto: str(g('F')), venc: dte(g('G')), banco: str(g('H')), valor: num(g('O')), pagado: num(g('P')), obs: str(g('Q')), factura: str(g('R')), punto: str(g('S')), saldo: num(g('T')) }); });
     rows('PERSONAL', 5, 5000, function (g, r) { pushPay({ cat: 'pers', row: r, fProg: dte(g('A')), fPago: dte(g('B')), sub: str(g('C')), tercero: str(g('D')), concepto: str(g('F')), factura: str(g('G')), banco: str(g('H')), valor: num(g('I')), pagado: num(g('J')), obs: str(g('K')), punto: str(g('L')), saldo: num(g('M')) }); });
     rows('GASTOS_VARIOS', 5, 5000, function (g, r) { pushPay({ cat: 'gast', row: r, fProg: dte(g('A')), fPago: dte(g('B')), sub: str(g('C')), tercero: str(g('D')), concepto: str(g('E')), factura: str(g('F')), banco: str(g('G')), valor: num(g('H')), pagado: num(g('I')), obs: str(g('J')), punto: str(g('K')), saldo: num(g('L')) }); });

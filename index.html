@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 6.6
+  Flujo de Caja La Matriarca — versión 6.7
 
   HISTORIAL DE VERSIONES
+  v6.7 (7 oct 2026) — Programado vs pagado: los totales de cada grupo y proveedor ahora
+    siguen el filtro. «Ya pagados» suma solo lo pagado (cuadra con el resumen de arriba),
+    «Faltan por pagar» suma solo lo pendiente y «Todos» muestra programado, pagado y falta.
   v6.6 (7 oct 2026) — Vuelve a mostrarse «Aplicación de pagos aprobados» en el menú
     (queda disponible para cuando se use; no se ha tocado nada de su funcionamiento).
   v6.5 (7 oct 2026) — Módulo nuevo: Programado vs pagado.
@@ -325,7 +328,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="6.6">
+<meta name="version" content="6.7">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -342,7 +345,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "6.6";
+window.MX_VERSION = "6.7";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -2611,23 +2614,25 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     h += '\x3cdiv class="panel cp-sum">\x3cdiv class="cp-cols">\x3cdiv>\x3csmall>Programado\x3c/small>\x3cb>' + M(tProg) + '\x3c/b>\x3cspan class="meta">' + pagos.length + ' pagos\x3c/span>\x3c/div>\x3cdiv class="ok">\x3csmall>Pagado\x3c/small>\x3cb>' + M(tPag) + '\x3c/b>\x3cspan class="meta">' + nPag + ' completos' + (nPar ? ' · ' + nPar + ' con abono' : '') + '\x3c/span>\x3c/div>\x3cdiv class="' + (tPend > 0.5 ? 'fa' : 'ok') + '">\x3csmall>Falta pagar\x3c/small>\x3cb>' + M(tPend) + '\x3c/b>\x3cspan class="meta">' + (nPen + nPar) + ' pendientes\x3c/span>\x3c/div>\x3c/div>' +
       '\x3cdiv class="bar-pct" role="img" aria-label="' + pct + '% pagado">\x3ci style="width:' + pct + '%">\x3c/i>\x3c/div>\x3cp class="note" style="margin:0">' + (tPend < 1 ? '\x3cb>Todo lo programado ya figura pagado.\x3c/b>' : 'De ' + M(tProg) + ' programados ya figuran pagados \x3cb>' + M(tPag) + '\x3c/b> (' + pct + '%). Faltan \x3cb>' + M(tPend) + '\x3c/b>.') + '\x3c/p>\x3c/div>';
     h += '\x3cdiv class="filters">' + seg('cFil', [['all', 'Todos'], ['pend', 'Faltan por pagar'], ['pag', 'Ya pagados']]) + '\x3c/div>';
-    var vis = all.filter(function (i) { return fil === 'all' || (fil === 'pend' ? i.est !== 'pagado' : i.est === 'pagado'); });
-    if (!vis.length) return h + '\x3cdiv class="panel empty">' + (fil === 'pend' ? 'No falta ningún pago de esta programación.' : 'Todavía no figura pagado ningún pago de esta programación.') + '\x3c/div>';
+    var vis = all.filter(function (i) { return fil === 'all' || (fil === 'pend' ? i.est !== 'pagado' : i.est !== 'pend'); });
+    if (!vis.length) return h + '\x3cdiv class="panel empty">' + (fil === 'pend' ? 'No falta ningún pago de esta programación.' : 'Todavía no figura pagado ningún pago de esta programación en el Excel cargado.') + '\x3c/div>';
     ['prov', 'serv', 'pers', 'gast', 'obl'].forEach(function (k) {
       var its = vis.filter(function (i) { return i.it.cat === k; }); if (!its.length) return;
-      var cats = all.filter(function (i) { return i.it.cat === k; }), cProg = sum(cats, function (i) { return i.prog; }), cPag = sum(cats, function (i) { return i.pag; }), cPend = sum(cats, function (i) { return i.pend; });
+      var cProg = sum(its, function (i) { return i.prog; }), cPag = sum(its, function (i) { return i.pag; }), cPend = sum(its, function (i) { return i.pend; }), cN = its.filter(function (i) { return !i.nc; }).length;
+      var cVal = fil === 'pag' ? cPag : cPend, cLbl = fil === 'pag' ? 'Pagado' : (fil === 'all' && cPend < 1 ? 'Al día' : 'Falta pagar');
+      var cSub = fil === 'all' ? cN + (cN === 1 ? ' pago' : ' pagos') + ' · programado ' + M(cProg) + ' · pagado ' + M(cPag) : cN + (cN === 1 ? ' factura' : ' facturas') + (fil === 'pag' ? ' con pago' : ' por pagar');
       var g = {}; its.forEach(function (i) { var kk = (i.it.tercero || '').toLowerCase(); (g[kk] = g[kk] || { name: i.it.tercero || '(sin nombre)', items: [] }).items.push(i); });
       var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
-      var bkey = 'cp|' + k, cp = cProg > 0 ? Math.max(0, Math.min(100, Math.round(cPag / cProg * 100))) : 0;
-      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + cats.filter(function (i) { return !i.nc; }).length + ' pagos · programado ' + M(cProg) + ' · pagado ' + M(cPag) + ' (' + cp + '%)\x3c/small>\x3c/div>\x3cdiv class="card-v">\x3csmall>' + (cPend < 1 ? 'Al día' : 'Falta pagar') + '\x3c/small>\x3cb>' + M(cPend) + '\x3c/b>\x3c/div>\x3c/summary>\x3cdiv class="ckl">' +
+      var bkey = 'cp|' + k + '|' + fil;
+      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + cSub + '\x3c/small>\x3c/div>\x3cdiv class="card-v">\x3csmall>' + cLbl + '\x3c/small>\x3cb>' + M(cVal) + '\x3c/b>\x3c/div>\x3c/summary>\x3cdiv class="ckl">' +
         gl.map(function (t) {
-          var tp = sum(t.items, function (i) { return i.prog; }), tg = sum(t.items, function (i) { return i.pag; }), tf = sum(t.items, function (i) { return i.pend; }), tkey = 'cp|' + k + '|' + t.name;
-          return '\x3cdetails class="party apf" data-k="' + esc(tkey) + '"' + (S.open[tkey] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot cp-' + (tf < 1 ? 'ok' : 'fa') + '">' + (tf < 1 ? 'Pagado ✔' : 'Falta ' + M(tf)) + '\x3c/span>\x3cspan class="sub">\x3cspan>Programado ' + M(tp) + '\x3c/span>\x3cspan>Pagado ' + M(tg) + '\x3c/span>\x3c/span>\x3c/summary>\x3cdiv class="ckl">' +
+          var tp = sum(t.items, function (i) { return i.prog; }), tg = sum(t.items, function (i) { return i.pag; }), tf = sum(t.items, function (i) { return i.pend; }), tkey = 'cp|' + k + '|' + fil + '|' + t.name, tn = t.items.filter(function (i) { return !i.nc; }).length;
+          return '\x3cdetails class="party apf" data-k="' + esc(tkey) + '"' + (S.open[tkey] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot cp-' + (fil === 'pag' || tf < 1 ? 'ok' : 'fa') + '">' + (fil === 'pag' ? 'Pagado ' + M(tg) : tf < 1 ? 'Pagado ✔' : 'Falta ' + M(tf)) + '\x3c/span>\x3cspan class="sub">\x3cspan>' + tn + (tn === 1 ? ' factura' : ' facturas') + '\x3c/span>' + (fil === 'all' ? '\x3cspan>Programado ' + M(tp) + '\x3c/span>\x3cspan>Pagado ' + M(tg) + '\x3c/span>' : '') + '\x3c/span>\x3c/summary>\x3cdiv class="ckl">' +
             t.items.map(function (i) {
               var x = i.x || i.it, badge = i.est === 'pagado' ? 'Pagado' : i.est === 'parcial' ? 'Abono' : 'Falta';
               var l2 = i.nc ? 'Nota crédito' + (i.est === 'pagado' ? ' · ya aplicada' : ' · por aplicar') : 'Programado ' + M(i.prog) + (i.pag ? ' · Pagado ' + M(i.pag) + (i.fPago ? ' el ' + F(i.fPago) : '') : '') + (i.est === 'pagado' && !i.x ? ' · ya no aparece pendiente en el Excel' : '');
-              return '\x3cdiv class="cprow st-' + i.est + '">\x3cspan class="ck-b">\x3cb>' + esc(refDe(x)) + '\x3c/b>' + (x.sub && k !== 'pers' ? '\x3cspan class="meta">' + esc(x.sub) + '\x3c/span>' : '') + '\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3c/span>\x3cspan class="cp-a">\x3cem>' + badge + '\x3c/em>\x3cb>' + M(i.est === 'pagado' ? i.prog : i.pend) + '\x3c/b>\x3c/span>\x3c/div>';
-            }).join('') + '\x3cdiv class="apf-end">Fin de ' + esc(t.name) + ' · ' + (tf < 1 ? 'todo pagado' : 'falta ' + M(tf)) + '\x3c/div>\x3c/div>\x3c/details>';
+              return '\x3cdiv class="cprow st-' + i.est + '">\x3cspan class="ck-b">\x3cb>' + esc(refDe(x)) + '\x3c/b>' + (x.sub && k !== 'pers' ? '\x3cspan class="meta">' + esc(x.sub) + '\x3c/span>' : '') + '\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3c/span>\x3cspan class="cp-a">\x3cem>' + badge + '\x3c/em>\x3cb>' + M(fil === 'pag' ? i.pag : (i.est === 'pagado' ? i.prog : i.pend)) + '\x3c/b>\x3c/span>\x3c/div>';
+            }).join('') + '\x3cdiv class="apf-end">Fin de ' + esc(t.name) + ' · ' + (fil === 'pag' ? 'pagado ' + M(tg) : tf < 1 ? 'todo pagado' : 'falta ' + M(tf)) + '\x3c/div>\x3c/div>\x3c/details>';
         }).join('') + '\x3c/div>\x3c/details>';
     });
     return h + '\x3cdiv class="meta" style="margin:10px 2px">Se compara lo que usted programó con lo que contabilidad ya registró como pagado en el último Excel cargado. Cuando se cargue un Excel nuevo, esta pantalla se actualiza sola.\x3c/div>';

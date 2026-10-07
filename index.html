@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 6.8
+  Flujo de Caja La Matriarca — versión 6.9
 
   HISTORIAL DE VERSIONES
+  v6.9 (7 oct 2026) — Programado vs pagado: informe en imagen (JPG) para socios.
+    · Botones «Descargar informe (imagen JPG)» y «Compartir por WhatsApp» (arriba y al final).
+    · La imagen tiene el tamaño de una pantalla de teléfono: avance en %, total programado,
+      pagado, falta por pagar y tabla por rubro. Corresponde a la semana abierta.
   v6.8 (7 oct 2026) — Programado vs pagado: cada grupo y proveedor muestra, en renglones
     separados y alineados, «Total programado», «Pagado» y «Falta por pagar» (etiqueta a la
     izquierda, valor a la derecha, sin que se peguen ni se crucen).
@@ -331,7 +335,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="6.8">
+<meta name="version" content="6.9">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -348,7 +352,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "6.8";
+window.MX_VERSION = "6.9";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -846,6 +850,8 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .party:not([open])>summary .cp-kvp dt{color:var(--muted)}
 .party[open]>summary .cp-kvp dt,.party[open]>summary .cp-kvp dd{color:var(--accent-ink)!important}
 .party>summary .cp-kvp dd{font-size:15px}
+.cp-bt{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.cp-bt .btn{flex:1 1 150px}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -2511,6 +2517,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       };
     });
     root.querySelectorAll('[data-cx]').forEach(function (b) { b.onclick = function () { S.cxcSel = S.cxcSel === b.dataset.cx ? null : b.dataset.cx; render(); }; });
+    root.querySelectorAll('[data-cimg]').forEach(function (b) { b.onclick = function () { compImagen(b.dataset.cimg); }; });
     root.querySelectorAll('[data-dimg]').forEach(function (b) { b.onclick = function () { dispImagen(b.dataset.dimg); }; });
     var rud = document.getElementById('r-undo'); if (rud) rud.onclick = function () { S.rOut = {}; render(); };
     var rpc = document.getElementById('r-proc'); if (rpc) rpc.onclick = repProcesar;
@@ -2610,6 +2617,109 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       return { it: it, x: x, prog: prog, pag: pag, pend: Math.abs(pend) < 1 ? 0 : pend, est: est, fPago: x ? x.ultPago : null, nc: prog < 0 };
     });
   }
+  /* ---------- v6.9 Imagen del informe «Programado vs pagado» (JPG tamaño teléfono) ---------- */
+  function compModelo(doc, all) {
+    var sum = function (arr, f) { return arr.reduce(function (s, i) { return s + f(i); }, 0); };
+    var pagos = all.filter(function (i) { return !i.nc; });
+    var cats = [];
+    ['prov', 'serv', 'pers', 'gast', 'obl'].forEach(function (k) {
+      var its = all.filter(function (i) { return i.it.cat === k; }); if (!its.length) return;
+      cats.push({ k: k, name: CATN[k], n: its.filter(function (i) { return !i.nc; }).length, prog: sum(its, function (i) { return i.prog; }), pag: sum(its, function (i) { return i.pag; }), pend: sum(its, function (i) { return i.pend; }) });
+    });
+    var g = {}; all.forEach(function (i) { var kk = (i.it.tercero || '').toLowerCase(); var t = g[kk] || (g[kk] = { name: i.it.tercero || '(sin nombre)', pend: 0, n: 0 }); t.pend += i.pend; if (!i.nc && i.est !== 'pagado') t.n++; });
+    var terc = Object.keys(g).map(function (kk) { return g[kk]; }).filter(function (t) { return t.pend >= 1; }).sort(function (a, b) { return b.pend - a.pend; });
+    return {
+      sem: F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + MX.toJS(doc.lunes).getUTCFullYear(), lunes: iso(doc.lunes),
+      prog: sum(all, function (i) { return i.prog; }), pag: sum(all, function (i) { return i.pag; }), pend: sum(all, function (i) { return i.pend; }),
+      n: pagos.length, nPag: pagos.filter(function (i) { return i.est === 'pagado'; }).length, nPar: pagos.filter(function (i) { return i.est === 'parcial'; }).length, nPen: pagos.filter(function (i) { return i.est === 'pend'; }).length,
+      cats: cats, terc: terc,
+      nota: 'Programación autorizada por ' + (doc.por || '') + ', guardada ' + String(stampLargo(doc.guardadoISO)).replace(/\.$/, '') + '. Lo pagado es lo que contabilidad registró en el Excel del informe del ' + F(W.fechaInforme, true) + '. Un pago con abono parcial se cuenta por lo abonado.'
+    };
+  }
+  function imgCompBlob(cb) {
+    var m = S._cp; if (!m) return;
+    var Wd = 402, SC = 3, P = 12, IW = Wd - 2 * P, FF = '-apple-system, "Segoe UI", Helvetica, Arial, sans-serif';
+    function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+    function wrap(c, t, w) { var ws = String(t).split(' '), ls = [], l = ''; ws.forEach(function (p) { var n = l ? l + ' ' + p : p; if (c.measureText(n).width > w && l) { ls.push(l); l = p; } else l = n; }); if (l) ls.push(l); return ls; }
+    function draw(c, H) {
+      c.fillStyle = '#F2F3EF'; c.fillRect(0, 0, Wd, H);
+      var y = 12;
+      function T(t, x, yy, size, wt, col, al) { c.font = wt + ' ' + size + 'px ' + FF; c.fillStyle = col; c.textAlign = al || 'left'; c.textBaseline = 'middle'; c.fillText(t, x, yy); return c.measureText(t).width; }
+      function TW(t, size, wt) { c.font = wt + ' ' + size + 'px ' + FF; return c.measureText(t).width; }
+      function TF(t, x, yy, size, wt, col, al, maxW, minS) {
+        var sz = size; t = String(t);
+        while (sz > (minS || 10) && TW(t, sz, wt) > maxW) sz -= .5;
+        if (TW(t, sz, wt) > maxW) { while (t.length > 1 && TW(t + '…', sz, wt) > maxW) t = t.slice(0, -1); t += '…'; }
+        return T(t, x, yy, sz, wt, col, al);
+      }
+      function card(h, fn) { c.save(); rr(c, P, y, IW, h, 12); c.fillStyle = '#fff'; c.fill(); c.clip(); fn(); c.restore(); c.save(); rr(c, P + .5, y + .5, IW - 1, h - 1, 12); c.strokeStyle = '#dfe3dc'; c.lineWidth = 1; c.stroke(); c.restore(); }
+      function band(yy, h, col, l, v) { c.fillStyle = col; c.fillRect(P, yy, IW, h); var wv = TF(v, P + IW - 12, yy + h / 2 + 1, 17, 800, '#fff', 'right', IW - 24 - 90, 12); TF(l, P + 12, yy + h / 2 + 1, 15, 800, '#fff', 'left', IW - 24 - wv - 14, 11); }
+      function sep(yy) { c.fillStyle = '#e3e6e0'; c.fillRect(P, yy, IW, 1); }
+      function rowT(yy, h, l, n, v, col) {
+        var wv = TF(v, P + IW - 12, yy + h / 2, 14.5, 800, col || '#14231B', 'right', IW - 24 - 80, 11), cnt = n != null ? '(' + n + ')' : '', wc = cnt ? TW(cnt, 12, 400) + 6 : 0;
+        var wl = TF(l, P + 12, yy + h / 2, 14, 400, '#14231B', 'left', IW - 24 - wv - 14 - wc, 10.5);
+        if (cnt) T(cnt, P + 12 + wl + 6, yy + h / 2 + 1, 12, 400, '#6b756e');
+      }
+      function bar(yy, h, pct, bg, fg) { c.fillStyle = bg; c.fillRect(P, yy, IW, h); c.fillStyle = fg; c.fillRect(P, yy, IW * Math.max(0, Math.min(100, pct)) / 100, h); }
+      function tres(yy, h, items) { var cw = IW / items.length; items.forEach(function (it, i) { if (i) { c.fillStyle = '#e3e6e0'; c.fillRect(P + i * cw, yy, 1, h); } TF(it[0], P + i * cw + cw / 2, yy + 14, 11.5, 600, '#6b756e', 'center', cw - 10, 9); TF(M(it[1]), P + i * cw + cw / 2, yy + 33, 14.5, 800, it[2], 'center', cw - 10, 10); }); }
+      var pctT = m.prog > 0 ? Math.max(0, Math.min(100, Math.round(m.pag / m.prog * 100))) : 0;
+      function band2(yy, h, col, l, v) { c.fillStyle = col; c.fillRect(P, yy, IW, h); var wv = TF(v, P + IW - 12, yy + h / 2 + 1, 16, 800, '#fff', 'right', IW - 24 - 90, 12); TF(l, P + 12, yy + h / 2 + 1, 14, 800, '#fff', 'left', IW - 24 - wv - 14, 10.5); }
+      // encabezado
+      rr(c, P, y, IW, 50, 12); c.fillStyle = '#151f1a'; c.fill();
+      var wd = TF(m.sem, P + IW - 12, y + 34, 12.5, 800, '#fff', 'right', 170, 10); TF('SEMANA', P + IW - 12, y + 15, 9, 700, '#aab5ae', 'right', 150, 8);
+      TF('LA MATRIARCA · INFORME PARA SOCIOS', P + 12, y + 15, 9.5, 700, '#aab5ae', 'left', IW - 24 - 100, 8);
+      TF('Programado vs pagado', P + 12, y + 34, 16, 800, '#fff', 'left', IW - 24 - wd - 12, 11);
+      y += 50 + 7;
+      // avance (hero)
+      var okk = m.pend < 1; rr(c, P, y, IW, 140, 14); var g1 = c.createLinearGradient(0, y, 0, y + 140); g1.addColorStop(0, okk ? '#2c7a4b' : '#0f3a2b'); g1.addColorStop(1, okk ? '#1d5a37' : '#082A20'); c.fillStyle = g1; c.fill();
+      rr(c, P + 1, y + 1, IW - 2, 138, 13); c.strokeStyle = '#C9A35A'; c.lineWidth = 1.5; c.stroke();
+      T('AVANCE DE LO PROGRAMADO', Wd / 2, y + 20, 11.5, 800, '#FFF8E7', 'center');
+      TF(pctT + '% pagado', Wd / 2, y + 62, 44, 800, '#F3D98B', 'center', IW - 24, 24);
+      rr(c, P + 16, y + 94, IW - 32, 14, 7); c.fillStyle = 'rgba(255,255,255,.22)'; c.fill();
+      if (pctT > 0) { c.save(); rr(c, P + 16, y + 94, IW - 32, 14, 7); c.clip(); c.fillStyle = '#7BD39E'; c.fillRect(P + 16, y + 94, (IW - 32) * pctT / 100, 14); c.restore(); }
+      TF(m.nPag + ' de ' + m.n + ' pagos completos' + (m.nPar ? ' · ' + m.nPar + ' con abono' : '') + ' · ' + m.nPen + ' sin pagar', Wd / 2, y + 125, 11.5, 400, 'rgba(255,248,231,.85)', 'center', IW - 24, 9);
+      y += 140 + 8;
+      // resumen en 3 renglones
+      function fila(yy, h, col, l, sub, v) { h = 54; c.fillStyle = col; c.fillRect(P, yy, IW, h); var wv = TF(v, P + IW - 12, yy + h / 2, 20, 800, '#fff', 'right', IW - 24 - 110, 13); TF(l, P + 12, yy + h / 2 - 7, 14.5, 800, '#fff', 'left', IW - 24 - wv - 14, 11); TF(sub, P + 12, yy + h / 2 + 11, 10.5, 400, 'rgba(255,255,255,.82)', 'left', IW - 24 - wv - 14, 8.5); }
+      card(162, function () {
+        fila(y, 54, '#2f3b35', 'Total programado', m.n + (m.n === 1 ? ' pago' : ' pagos') + ' autorizados', M(m.prog));
+        fila(y + 54, 54, '#245a3a', 'Pagado', m.nPag + (m.nPag === 1 ? ' pago completo' : ' pagos completos') + (m.nPar ? ' · ' + m.nPar + ' con abono' : ''), M(m.pag));
+        fila(y + 108, 54, okk ? '#245a3a' : '#9c2027', 'Falta por pagar', (m.nPen + m.nPar) + ((m.nPen + m.nPar) === 1 ? ' pago pendiente' : ' pagos pendientes'), M(m.pend));
+      });
+      y += 162 + 8;
+      // nota (se mide primero para reservar su espacio al final)
+      c.font = '400 9.5px ' + FF; var nl = wrap(c, m.nota, IW - 4), notaH = nl.length * 12 + 8;
+      // por rubro: ocupa el espacio que queda hasta llenar la pantalla
+      var nr = m.cats.length, colW = 84, xF = P + IW - 10, xP = xF - colW, xG = xP - colW, nameW = xG - colW - (P + 10) - 2;
+      var RH = Math.max(46, Math.min(84, Math.floor((H - y - notaH - 8 - 26 - 4) / nr)));
+      card(26 + nr * RH, function () {
+        c.fillStyle = '#245a3a'; c.fillRect(P, y, IW, 26);
+        T('Por rubro', P + 10, y + 13.5, 12, 800, '#fff'); T('Programado', xG, y + 13.5, 10, 700, '#fff', 'right'); T('Pagado', xP, y + 13.5, 10, 700, '#fff', 'right'); T('Falta', xF, y + 13.5, 10, 700, '#fff', 'right');
+        m.cats.forEach(function (r, i) {
+          var yy = y + 26 + i * RH, p = r.prog > 0 ? Math.round(Math.max(0, Math.min(100, r.pag / r.prog * 100))) : 0, mid = yy + (RH - 12) / 2;
+          if (i) sep(yy);
+          TF(r.name === 'Obligaciones financieras' ? 'Oblig. financieras' : r.name, P + 10, mid - 8, 13, 800, '#14231B', 'left', nameW, 9.5);
+          TF(p + '% pagado · ' + r.n + (r.n === 1 ? ' pago' : ' pagos'), P + 10, mid + 9, 10, 400, '#6b756e', 'left', nameW, 8);
+          TF(M(r.prog), xG, mid, 12, 800, '#14231B', 'right', colW - 4, 8.5); TF(M(r.pag), xP, mid, 12, 800, '#1f7a4d', 'right', colW - 4, 8.5); TF(M(r.pend), xF, mid, 12, 800, r.pend < 1 ? '#1f7a4d' : '#9c2027', 'right', colW - 4, 8.5);
+          bar(yy + RH - 12, 6, p, '#f3dcd9', '#2c7a4b');
+        });
+      });
+      y += 26 + nr * RH + 8;
+      nl.forEach(function (l, i) { T(l, P + 2, y + 6 + i * 12, 9.5, 400, '#6b756e'); });
+      y += notaH;
+      return y;
+    }
+    var H = 874;
+    var cv = document.createElement('canvas'); cv.width = Wd * SC; cv.height = H * SC; var c2 = cv.getContext('2d'); c2.scale(SC, SC); draw(c2, H);
+    cv.toBlob(function (b) { cb(b, 'Programado-vs-pagado-' + m.lunes + '.jpg'); }, 'image/jpeg', 0.95);
+  }
+  function compImagen(modo) {
+    imgCompBlob(function (blob, nombre) {
+      if (!blob) return;
+      if (modo === 'sh') { try { var f = new File([blob], nombre, { type: 'image/jpeg' }); if (navigator.canShare && navigator.canShare({ files: [f] })) { navigator.share({ files: [f], title: 'Programado vs pagado' }).catch(function () {}); return; } } catch (e) {} }
+      pdfBaja(blob, nombre);
+    });
+  }
   function vComp() {
     var D = authD(), hoyL = MX.lunesDe(D);
     if (S.aWeek == null) S.aWeek = hoyL;
@@ -2626,9 +2736,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var tProg = sum(all, function (i) { return i.prog; }), tPag = sum(all, function (i) { return i.pag; }), tPend = sum(all, function (i) { return i.pend; });
     var nPag = pagos.filter(function (i) { return i.est === 'pagado'; }).length, nPar = pagos.filter(function (i) { return i.est === 'parcial'; }).length, nPen = pagos.filter(function (i) { return i.est === 'pend'; }).length;
     var pct = tProg > 0 ? Math.max(0, Math.min(100, Math.round(tPag / tProg * 100))) : 0;
+    S._cp = compModelo(doc, all);
+    var btnImg = '\x3cdiv class="cp-bt no-print">\x3cbutton type="button" class="btn pri" data-cimg="dl">Descargar informe (imagen JPG)\x3c/button>\x3cbutton type="button" class="btn" data-cimg="sh">Compartir por WhatsApp\x3c/button>\x3c/div>';
     h += '\x3cdiv class="banner">\x3cspan>\x3cb>Programación guardada\x3c/b> · ' + pagos.length + (pagos.length === 1 ? ' pago' : ' pagos') + ' · ' + M(doc.total) + '\x3cbr>\x3cspan class="meta">por ' + esc(doc.por || '') + ' · ' + esc(stampLargo(doc.guardadoISO)) + '\x3cbr>Comparada con el Excel del informe del ' + F(W.fechaInforme, true) + '\x3c/span>\x3c/span>\x3c/div>';
     h += '\x3cdiv class="panel cp-sum">\x3cdiv class="cp-cols">\x3cdiv>\x3csmall>Programado\x3c/small>\x3cb>' + M(tProg) + '\x3c/b>\x3cspan class="meta">' + pagos.length + ' pagos\x3c/span>\x3c/div>\x3cdiv class="ok">\x3csmall>Pagado\x3c/small>\x3cb>' + M(tPag) + '\x3c/b>\x3cspan class="meta">' + nPag + ' completos' + (nPar ? ' · ' + nPar + ' con abono' : '') + '\x3c/span>\x3c/div>\x3cdiv class="' + (tPend > 0.5 ? 'fa' : 'ok') + '">\x3csmall>Falta pagar\x3c/small>\x3cb>' + M(tPend) + '\x3c/b>\x3cspan class="meta">' + (nPen + nPar) + ' pendientes\x3c/span>\x3c/div>\x3c/div>' +
       '\x3cdiv class="bar-pct" role="img" aria-label="' + pct + '% pagado">\x3ci style="width:' + pct + '%">\x3c/i>\x3c/div>\x3cp class="note" style="margin:0">' + (tPend < 1 ? '\x3cb>Todo lo programado ya figura pagado.\x3c/b>' : 'De ' + M(tProg) + ' programados ya figuran pagados \x3cb>' + M(tPag) + '\x3c/b> (' + pct + '%). Faltan \x3cb>' + M(tPend) + '\x3c/b>.') + '\x3c/p>\x3c/div>';
+    h += btnImg;
     h += '\x3cdiv class="filters">' + seg('cFil', [['all', 'Todos'], ['pend', 'Faltan por pagar'], ['pag', 'Ya pagados']]) + '\x3c/div>';
     var vis = all.filter(function (i) { return fil === 'all' || (fil === 'pend' ? i.est !== 'pagado' : i.est !== 'pend'); });
     if (!vis.length) return h + '\x3cdiv class="panel empty">' + (fil === 'pend' ? 'No falta ningún pago de esta programación.' : 'Todavía no figura pagado ningún pago de esta programación en el Excel cargado.') + '\x3c/div>';
@@ -2653,7 +2766,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
             }).join('') + '\x3cdiv class="apf-end">Fin de ' + esc(t.name) + ' · ' + (fil === 'pag' ? 'pagado ' + M(tg) : tf < 1 ? 'todo pagado' : 'falta ' + M(tf)) + '\x3c/div>\x3c/div>\x3c/details>';
         }).join('') + '\x3c/div>\x3c/details>';
     });
-    return h + '\x3cdiv class="meta" style="margin:10px 2px">Se compara lo que usted programó con lo que contabilidad ya registró como pagado en el último Excel cargado. Cuando se cargue un Excel nuevo, esta pantalla se actualiza sola.\x3c/div>';
+    return h + btnImg + '\x3cdiv class="meta" style="margin:10px 2px">Se compara lo que usted programó con lo que contabilidad ya registró como pagado en el último Excel cargado. Cuando se cargue un Excel nuevo, esta pantalla se actualiza sola.\x3c/div>';
   }
   function vAplic() {
     if (!(esAdminRol() || window.MX_ROLE === 'contable')) return '\x3cdiv class="panel empty">Este módulo es solo para contabilidad.\x3c/div>';

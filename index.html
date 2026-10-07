@@ -1,8 +1,20 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 6.4
+  Flujo de Caja La Matriarca — versión 6.5
 
   HISTORIAL DE VERSIONES
+  v6.5 (7 oct 2026) — Módulo nuevo: Programado vs pagado.
+    · Compara la programación autorizada de cada semana con lo que contabilidad ya
+      registró como pagado en el último Excel cargado: programado, pagado, falta pagar,
+      porcentaje y detalle por grupo, proveedor y factura (con fecha de pago).
+    · Filtros: Todos / Faltan por pagar / Ya pagados. Cambia solo al cargar un Excel nuevo.
+    · No modifica el Excel. El módulo «Aplicación de pagos aprobados» queda oculto del menú.
+  v6.5 (7 oct 2026) — Módulo nuevo: Programado vs pagado.
+    · Compara la programación autorizada de cada semana con lo que contabilidad ya
+      registró como pagado en el último Excel cargado: programado, pagado, falta pagar,
+      porcentaje y detalle por grupo, proveedor y factura (con fecha de pago).
+    · Filtros: Todos / Faltan por pagar / Ya pagados. Cambia solo al cargar un Excel nuevo.
+    · No modifica el Excel. El módulo «Aplicación de pagos aprobados» queda oculto del menú.
   v6.4 (7 oct 2026) — Aplicación de pagos: cada proveedor abierto se ve en su propio recuadro.
     · Al abrir un proveedor queda enmarcado: borde grueso, encabezado de color con el nombre
       y, al final de sus facturas, una franja «Fin de <proveedor> · total». Así no se
@@ -311,7 +323,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="6.4">
+<meta name="version" content="6.5">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -328,7 +340,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "6.4";
+window.MX_VERSION = "6.5";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -797,6 +809,22 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .party.apf[open] .ckrow.on{background:var(--accent-soft);border-left-color:var(--accent)}
 .apf-end{padding:10px 14px;font-size:13px;font-weight:700;background:var(--accent-soft);border-top:2px solid var(--accent);color:var(--accent)}
 .party.apf:not([open]){border-bottom:1px solid var(--line)}
+.cp-sum{padding:14px}
+.cp-cols{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+.cp-cols>div{background:var(--sunk);border-radius:12px;padding:10px 14px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:0 10px}.cp-cols>div .meta{grid-column:1}.cp-cols>div small{grid-column:1}.cp-cols>div b{grid-column:2;grid-row:1 / span 2;text-align:right}
+.cp-cols small{font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700}
+.cp-cols b{font-size:22px;white-space:nowrap}
+.cp-cols .ok b{color:var(--good,#1f7a4d)} .cp-cols .fa b{color:#b03a2e}
+.cprow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px 14px;border-top:1px solid var(--line);border-left:5px solid #b03a2e;background:var(--surface)}
+.cprow.st-pagado{border-left-color:#1f7a4d;background:var(--accent-soft)}
+.cprow.st-parcial{border-left-color:#d99a1b}
+.cprow .ck-b{display:flex;flex-direction:column;gap:2px;min-width:0}
+.cp-a{display:flex;flex-direction:column;align-items:flex-end;gap:3px;white-space:nowrap}
+.cp-a em{font-style:normal;font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:999px;background:#f9d6d1;color:#8e2a20}
+.st-pagado .cp-a em{background:#cfe8da;color:#14573a}
+.st-parcial .cp-a em{background:#fbe8bd;color:#7a5410}
+.party .tot.cp-ok{color:#1f7a4d} .party .tot.cp-fa{color:#b03a2e}
+.party.apf[open]>summary .tot.cp-ok,.party.apf[open]>summary .tot.cp-fa{color:var(--accent-ink)}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -978,8 +1006,8 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 
   var root = document.getElementById('app');
   var MODE = window.MX_MODE || 'caja';
-  window.MX_SETMODE = function (m) { MODE = m; Object.keys(S.open).forEach(function (k) { if (/^(ba|ap|br|rp)\|/.test(k)) delete S.open[k]; }); window.scrollTo(0, 0); render(); };
-  var SOLO = { ventas: 'Ventas e ingresos', egresos: 'Egresos y gastos', pagar: 'Cuentas por pagar', prog: 'Programación de pagos', auth: 'Pagos autorizados', aplic: 'Aplicación de pagos aprobados', disp: 'Disponible real en efectivo' };
+  window.MX_SETMODE = function (m) { MODE = m; Object.keys(S.open).forEach(function (k) { if (/^(ba|ap|br|rp|cp)\|/.test(k)) delete S.open[k]; }); window.scrollTo(0, 0); render(); };
+  var SOLO = { ventas: 'Ventas e ingresos', egresos: 'Egresos y gastos', pagar: 'Cuentas por pagar', prog: 'Programación de pagos', auth: 'Pagos autorizados', aplic: 'Aplicación de pagos aprobados', comp: 'Programado vs pagado', disp: 'Disponible real en efectivo' };
   function tabsVisibles() { return SOLO[MODE] ? [] : (window.MX_NAV ? TABS.filter(function (t) { return !SOLO[t[0]]; }) : TABS); }
   function render() {
     if (SOLO[MODE]) S.tab = MODE;
@@ -993,7 +1021,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       (window.MX_NAV ? '\x3cbutton class="nav-back" id="nav-back" aria-label="Volver al menú">‹\x3c/button>' : '') +
       '\x3cdiv class="brand">\x3csmall>La Matriarca · Tesorería' + (window.MX_VERSION ? ' · v' + window.MX_VERSION : '') + '\x3c/small>\x3cb>' + (SOLO[MODE] || 'Flujo de caja') + '\x3c/b>\x3c/div>' +
       (window.MX_NAV ? '\x3cbutton class="nav-exit" id="nav-exit">Salir\x3c/button>' : '') +
-      (MODE === 'egresos' || MODE === 'prog' || MODE === 'auth' || MODE === 'aplic' ? '' : '\x3cdiv class="datebox" role="group" aria-label="Fecha de corte">\x3cbutton id="d-prev" aria-label="Día anterior">‹\x3c/button>\x3cinput type="date" id="d-in" value="' + iso(S.D) + '" min="' + iso(b.min) + '" max="' + iso(b.max + 30) + '" aria-label="Fecha de corte">\x3cbutton id="d-next" aria-label="Día siguiente">›\x3c/button>\x3c/div>') +
+      (MODE === 'egresos' || MODE === 'prog' || MODE === 'auth' || MODE === 'aplic' || MODE === 'comp' ? '' : '\x3cdiv class="datebox" role="group" aria-label="Fecha de corte">\x3cbutton id="d-prev" aria-label="Día anterior">‹\x3c/button>\x3cinput type="date" id="d-in" value="' + iso(S.D) + '" min="' + iso(b.min) + '" max="' + iso(b.max + 30) + '" aria-label="Fecha de corte">\x3cbutton id="d-next" aria-label="Día siguiente">›\x3c/button>\x3c/div>') +
       (window.MX_ROLE === 'lector' || SOLO[MODE] ? '' : '\x3clabel class="btn pri" for="file-in">Cargar Excel\x3cspan class="hide-xs"> del día\x3c/span>\x3c/label>') + '\x3cinput type="file" id="file-in" accept=".xlsx,.xlsm,.xls" hidden>' +
       '\x3c/div>\x3c/div>' + (SOLO[MODE] ? '' : '\x3cdiv class="tabbar">\x3cnav class="wrap tabs" role="tablist">') + tabsVisibles().map(function (t) {
         var ct = t[0] === 'pagar' ? '\x3cspan class="ct">' + mm(R.pend.tAll) + '\x3c/span>' : t[0] === 'resumen' && A.filter(function (a) { return a.n === 'rojo'; }).length ? '\x3cspan class="ct">' + A.filter(function (a) { return a.n === 'rojo'; }).length + ' alertas\x3c/span>' : '';
@@ -1003,7 +1031,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (pending) html += '\x3cdiv class="banner">\x3cspan>Está viendo \x3cb>' + esc(pending.name) + '\x3c/b>, cargado ahora. ' + (artifactNS ? 'Guárdelo para que esta página lo muestre a todos.' : 'Solo usted lo ve en este dispositivo; para guardarlo para todos, ábralo con una cuenta con permiso de edición.') + '\x3c/span>\x3cspan style="display:flex;gap:8px">' + (artifactNS ? '\x3cbutton class="btn pri" id="save">Guardar para todos\x3c/button>' : '') + '\x3cbutton class="btn" id="discard">Volver a los datos guardados\x3c/button>\x3c/span>\x3c/div>';
     if (S.err) html += '\x3cdiv class="banner err">\x3cspan>' + esc(S.err) + '\x3c/span>\x3cbutton class="btn" id="err-x">Cerrar\x3c/button>\x3c/div>';
     if (S.tab !== 'resumen' && MODE !== 'disp' && MODE !== 'aplic') html += '\x3cdiv class="meta">Datos del Excel “Tesorería Integrada” · fecha del informe en el archivo: ' + F(W.fechaInforme, true) + ' · control desde el ' + F(W.inicio, true) + ' · cargado ' + fmtStamp(W.cargado) + '\x3c/div>';
-    html += ({ aplic: vAplic, auth: vAuth, prog: vProg, egresos: vEgresos, ventas: vVentas, resumen: vResumen, disp: vDisp, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
+    html += ({ comp: vComp, aplic: vAplic, auth: vAuth, prog: vProg, egresos: vEgresos, ventas: vVentas, resumen: vResumen, disp: vDisp, pagar: vPagar, cobrar: vCobrar, bancos: vBancos, dia: vDia, semanas: vSemanas, flujo: vFlujo })[S.tab](R, A);
     html += '\x3c/main>\x3cdiv id="tip" hidden>\x3c/div>';
     var sy = window.scrollY;
     root.innerHTML = html;
@@ -1453,7 +1481,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var docN = { semana: id, lunes: L, fechaPago: S.aFecha || null, items: items, total: total, n: items.length, por: por, guardadoISO: ahora, fechaInforme: W.fechaInforme || null, plazo: plazo, rango: rg ? rg.largo : '', rev: (prev && prev.rev || 0) + 1,
       hist: ((prev && prev.hist) || []).concat([{ en: ahora, por: por, n: items.length, total: total }]).slice(-20) };
     var b = document.getElementById('a-save'); if (b) { b.disabled = true; b.textContent = 'Guardando…'; }
-    window.MX_AUTH.save(id, docN).then(function () { S.aDocs[id] = docN; S.aInit = null; S.aView = 'rep'; Object.keys(S.open).forEach(function (k) { if (/^(ba|ap|br|rp)\|/.test(k)) delete S.open[k]; }); S.err = null; window.scrollTo(0, 0); render(); }).catch(function (e) {
+    window.MX_AUTH.save(id, docN).then(function () { S.aDocs[id] = docN; S.aInit = null; S.aView = 'rep'; Object.keys(S.open).forEach(function (k) { if (/^(ba|ap|br|rp|cp)\|/.test(k)) delete S.open[k]; }); S.err = null; window.scrollTo(0, 0); render(); }).catch(function (e) {
       S.err = (e && e.code === 'permission-denied') ? 'Su usuario no tiene permiso para guardar autorizaciones. Solo el administrador puede.' : 'No se pudo guardar la autorización: ' + (e && e.message || 'error desconocido'); render();
     });
   }
@@ -2551,6 +2579,57 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     items.forEach(function (i) { if (i.nc) { var t = dest[i.k]; if (t ? S.apSel[t] : tiene[i.x.cat + '|' + (i.x.tercero || '').toLowerCase()]) S.apSel[i.k] = 1; else delete S.apSel[i.k]; } });
     return dest;
   }
+  /* ---------- v6.5 Programado vs pagado ---------- */
+  function compItems(doc) {
+    var map = {}; MX.facturas(W).forEach(function (x) { map[aKey(x)] = x; });
+    return doc.items.map(function (it) {
+      var x = map[it.k], prog = it.saldo || 0, pend = x ? x.saldo : 0, pag = prog - pend;
+      if (prog > 0) pag = Math.max(0, Math.min(prog, pag)); else pag = Math.min(0, Math.max(prog, pag));
+      var est = Math.abs(pend) < 1 ? 'pagado' : (Math.abs(pag) >= 1 ? 'parcial' : 'pend');
+      return { it: it, x: x, prog: prog, pag: pag, pend: Math.abs(pend) < 1 ? 0 : pend, est: est, fPago: x ? x.ultPago : null, nc: prog < 0 };
+    });
+  }
+  function vComp() {
+    var D = authD(), hoyL = MX.lunesDe(D);
+    if (S.aWeek == null) S.aWeek = hoyL;
+    var L = S.aWeek, id = iso(L);
+    aLoad(L);
+    var doc = S.aDocs[id];
+    var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Programado vs pagado\x3c/h2>\x3cspan class="meta">Lo autorizado de la semana frente a lo que ya figura pagado en el Excel\x3c/span>\x3c/div>\x3c/div>';
+    h += '\x3cdiv class="weeknav">\x3cbutton class="btn" id="a-prev" aria-label="Semana anterior">‹ Anterior\x3c/button>\x3cdiv class="weeknav-t">\x3csmall>' + (L === hoyL ? 'Semana actual' : L === hoyL - 7 ? 'Semana anterior' : L === hoyL + 7 ? 'Semana siguiente' : 'Semana') + '\x3c/small>\x3cb>Lun ' + F(L) + ' – dom ' + F(L + 6) + '\x3c/b>\x3c/div>\x3cbutton class="btn" id="a-next" aria-label="Semana siguiente">Siguiente ›\x3c/button>\x3c/div>';
+    if (doc === undefined) return h + '\x3cdiv class="panel empty">Cargando la programación de esta semana…\x3c/div>';
+    if (!doc) return h + '\x3cdiv class="panel empty">Para esta semana todavía no hay una programación autorizada guardada.\x3c/div>';
+    var all = compItems(doc), fil = S.cFil || 'all';
+    var sum = function (arr, f) { return arr.reduce(function (s, i) { return s + f(i); }, 0); };
+    var pagos = all.filter(function (i) { return !i.nc; });
+    var tProg = sum(all, function (i) { return i.prog; }), tPag = sum(all, function (i) { return i.pag; }), tPend = sum(all, function (i) { return i.pend; });
+    var nPag = pagos.filter(function (i) { return i.est === 'pagado'; }).length, nPar = pagos.filter(function (i) { return i.est === 'parcial'; }).length, nPen = pagos.filter(function (i) { return i.est === 'pend'; }).length;
+    var pct = tProg > 0 ? Math.max(0, Math.min(100, Math.round(tPag / tProg * 100))) : 0;
+    h += '\x3cdiv class="banner">\x3cspan>\x3cb>Programación guardada\x3c/b> · ' + pagos.length + (pagos.length === 1 ? ' pago' : ' pagos') + ' · ' + M(doc.total) + '\x3cbr>\x3cspan class="meta">por ' + esc(doc.por || '') + ' · ' + esc(stampLargo(doc.guardadoISO)) + '\x3cbr>Comparada con el Excel del informe del ' + F(W.fechaInforme, true) + '\x3c/span>\x3c/span>\x3c/div>';
+    h += '\x3cdiv class="panel cp-sum">\x3cdiv class="cp-cols">\x3cdiv>\x3csmall>Programado\x3c/small>\x3cb>' + M(tProg) + '\x3c/b>\x3cspan class="meta">' + pagos.length + ' pagos\x3c/span>\x3c/div>\x3cdiv class="ok">\x3csmall>Pagado\x3c/small>\x3cb>' + M(tPag) + '\x3c/b>\x3cspan class="meta">' + nPag + ' completos' + (nPar ? ' · ' + nPar + ' con abono' : '') + '\x3c/span>\x3c/div>\x3cdiv class="' + (tPend > 0.5 ? 'fa' : 'ok') + '">\x3csmall>Falta pagar\x3c/small>\x3cb>' + M(tPend) + '\x3c/b>\x3cspan class="meta">' + (nPen + nPar) + ' pendientes\x3c/span>\x3c/div>\x3c/div>' +
+      '\x3cdiv class="bar-pct" role="img" aria-label="' + pct + '% pagado">\x3ci style="width:' + pct + '%">\x3c/i>\x3c/div>\x3cp class="note" style="margin:0">' + (tPend < 1 ? '\x3cb>Todo lo programado ya figura pagado.\x3c/b>' : 'De ' + M(tProg) + ' programados ya figuran pagados \x3cb>' + M(tPag) + '\x3c/b> (' + pct + '%). Faltan \x3cb>' + M(tPend) + '\x3c/b>.') + '\x3c/p>\x3c/div>';
+    h += '\x3cdiv class="filters">' + seg('cFil', [['all', 'Todos'], ['pend', 'Faltan por pagar'], ['pag', 'Ya pagados']]) + '\x3c/div>';
+    var vis = all.filter(function (i) { return fil === 'all' || (fil === 'pend' ? i.est !== 'pagado' : i.est === 'pagado'); });
+    if (!vis.length) return h + '\x3cdiv class="panel empty">' + (fil === 'pend' ? 'No falta ningún pago de esta programación.' : 'Todavía no figura pagado ningún pago de esta programación.') + '\x3c/div>';
+    ['prov', 'serv', 'pers', 'gast', 'obl'].forEach(function (k) {
+      var its = vis.filter(function (i) { return i.it.cat === k; }); if (!its.length) return;
+      var cats = all.filter(function (i) { return i.it.cat === k; }), cProg = sum(cats, function (i) { return i.prog; }), cPag = sum(cats, function (i) { return i.pag; }), cPend = sum(cats, function (i) { return i.pend; });
+      var g = {}; its.forEach(function (i) { var kk = (i.it.tercero || '').toLowerCase(); (g[kk] = g[kk] || { name: i.it.tercero || '(sin nombre)', items: [] }).items.push(i); });
+      var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      var bkey = 'cp|' + k, cp = cProg > 0 ? Math.max(0, Math.min(100, Math.round(cPag / cProg * 100))) : 0;
+      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + cats.filter(function (i) { return !i.nc; }).length + ' pagos · programado ' + M(cProg) + ' · pagado ' + M(cPag) + ' (' + cp + '%)\x3c/small>\x3c/div>\x3cdiv class="card-v">\x3csmall>' + (cPend < 1 ? 'Al día' : 'Falta pagar') + '\x3c/small>\x3cb>' + M(cPend) + '\x3c/b>\x3c/div>\x3c/summary>\x3cdiv class="ckl">' +
+        gl.map(function (t) {
+          var tp = sum(t.items, function (i) { return i.prog; }), tg = sum(t.items, function (i) { return i.pag; }), tf = sum(t.items, function (i) { return i.pend; }), tkey = 'cp|' + k + '|' + t.name;
+          return '\x3cdetails class="party apf" data-k="' + esc(tkey) + '"' + (S.open[tkey] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot cp-' + (tf < 1 ? 'ok' : 'fa') + '">' + (tf < 1 ? 'Pagado ✔' : 'Falta ' + M(tf)) + '\x3c/span>\x3cspan class="sub">\x3cspan>Programado ' + M(tp) + '\x3c/span>\x3cspan>Pagado ' + M(tg) + '\x3c/span>\x3c/span>\x3c/summary>\x3cdiv class="ckl">' +
+            t.items.map(function (i) {
+              var x = i.x || i.it, badge = i.est === 'pagado' ? 'Pagado' : i.est === 'parcial' ? 'Abono' : 'Falta';
+              var l2 = i.nc ? 'Nota crédito' + (i.est === 'pagado' ? ' · ya aplicada' : ' · por aplicar') : 'Programado ' + M(i.prog) + (i.pag ? ' · Pagado ' + M(i.pag) + (i.fPago ? ' el ' + F(i.fPago) : '') : '') + (i.est === 'pagado' && !i.x ? ' · ya no aparece pendiente en el Excel' : '');
+              return '\x3cdiv class="cprow st-' + i.est + '">\x3cspan class="ck-b">\x3cb>' + esc(refDe(x)) + '\x3c/b>' + (x.sub && k !== 'pers' ? '\x3cspan class="meta">' + esc(x.sub) + '\x3c/span>' : '') + '\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3c/span>\x3cspan class="cp-a">\x3cem>' + badge + '\x3c/em>\x3cb>' + M(i.est === 'pagado' ? i.prog : i.pend) + '\x3c/b>\x3c/span>\x3c/div>';
+            }).join('') + '\x3cdiv class="apf-end">Fin de ' + esc(t.name) + ' · ' + (tf < 1 ? 'todo pagado' : 'falta ' + M(tf)) + '\x3c/div>\x3c/div>\x3c/details>';
+        }).join('') + '\x3c/div>\x3c/details>';
+    });
+    return h + '\x3cdiv class="meta" style="margin:10px 2px">Se compara lo que usted programó con lo que contabilidad ya registró como pagado en el último Excel cargado. Cuando se cargue un Excel nuevo, esta pantalla se actualiza sola.\x3c/div>';
+  }
   function vAplic() {
     if (!(esAdminRol() || window.MX_ROLE === 'contable')) return '\x3cdiv class="panel empty">Este módulo es solo para contabilidad.\x3c/div>';
     if (!S.ap) S.ap = { name: W.archivoNombre || 'Excel', buf: null, cargado: W.cargado, msg: null, nApl: 0 };
@@ -3189,9 +3268,10 @@ var MX = (function () {
 if (typeof module !== 'undefined') module.exports = MX;
 </script>
 <script>(function () {
+  var APLIC_VISIBLE = false; /* v6.5: el módulo de aplicar pagos queda oculto; el Excel lo actualiza contabilidad */
   var ADMIN_EMAIL = 'memofontalvo@gmail.com';
   var DOMINIO = 'usuarios.caja-matriarca-bq.firebaseapp.com';
-  var MODS = [['caja', 'Flujo de caja'], ['disp', 'Disponible real en efectivo'], ['ventas', 'Ventas e ingresos'], ['egresos', 'Egresos y gastos'], ['pagar', 'Cuentas por pagar'], ['prog', 'Programación de pagos'], ['auth', 'Pagos autorizados'], ['aplic', 'Aplicación de pagos aprobados']];
+  var MODS = [['caja', 'Flujo de caja'], ['disp', 'Disponible real en efectivo'], ['ventas', 'Ventas e ingresos'], ['egresos', 'Egresos y gastos'], ['pagar', 'Cuentas por pagar'], ['prog', 'Programación de pagos'], ['auth', 'Pagos autorizados'], ['comp', 'Programado vs pagado'], ['aplic', 'Aplicación de pagos aprobados']];
   function modsHtml(p, sel) { return '\x3cdiv class="g-mods" id="' + p + '-mods">' + MODS.map(function (m) { return '\x3clabel class="g-mod">\x3cinput type="checkbox" data-mod="' + m[0] + '"' + (!Array.isArray(sel) || sel.indexOf(m[0]) >= 0 ? ' checked' : '') + '>\x3cspan>' + m[1] + '\x3c/span>\x3c/label>'; }).join('') + '\x3c/div>'; }
   function leerMods(p) { var l = [], t = 0; document.querySelectorAll('#' + p + '-mods [data-mod]').forEach(function (c) { t++; if (c.checked) l.push(c.dataset.mod); }); return l.length === t ? null : l; }
   function puedeMod(k) { if (esAdmin() || !perfil || !Array.isArray(perfil.modulos)) return true; return perfil.modulos.indexOf(k) >= 0; }
@@ -3499,6 +3579,7 @@ if (typeof module !== 'undefined') module.exports = MX;
   var ICO = {
     egresos: '\x3cpath d="M4 5v14M4 5h16"/>\x3cpath d="M8 9l3.5 4 3-2.5L19 16"/>\x3cpath d="M15 16h4v-4"/>',
     pagar: '\x3cpath d="M7 3h10v18l-2.5-1.5L12 21l-2.5-1.5L7 21z"/>\x3cpath d="M10 8h4M10 12h4"/>',
+    comp: '\x3cpath d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>\x3cpath d="M13 7l2.5 2.5L20 5"/>',
     aplic: '\x3crect x="4" y="3.5" width="16" height="17" rx="2"/>\x3cpath d="M8 8.5h8M8 12h5"/>\x3cpath d="M9 16.5l2 2 4-4.2"/>',
     auth: '\x3cpath d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/>\x3cpath d="M8.8 12l2.3 2.3 4.2-4.4"/>',
     prog: '\x3crect x="3.5" y="5" width="17" height="15" rx="2"/>\x3cpath d="M3.5 10h17M8 3v4M16 3v4"/>\x3cpath d="M8.5 15l2.2 2.2 4.3-4.4"/>',
@@ -3513,13 +3594,13 @@ if (typeof module !== 'undefined') module.exports = MX;
   function quien() { return perfil && perfil.nombre ? perfil.nombre : (auth.currentUser ? auth.currentUser.email : ''); }
   function menu(msg) {
     hideApp(); gate.hidden = false; gate.className = ''; window.scrollTo(0, 0);
-    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['disp', 'Disponible real en efectivo', 'Lo que hay en bancos y caja menos los pagos autorizados'], ['ventas', 'Ventas e ingresos', 'Ventas por día y por punto, impoconsumo y otros ingresos'], ['egresos', 'Egresos y gastos', 'Todo lo causado por mes, semana o periodo, pagado y sin pagar'], ['pagar', 'Cuentas por pagar', 'Pendientes por proveedor y por semana, pagas y sin pagar'], ['prog', 'Programación de pagos', 'Lo programado para pagar cada semana, con su detalle'], ['auth', 'Pagos autorizados', 'Autorice los pagos de la semana y genere el informe para imprimir'], ['aplic', 'Aplicación de pagos aprobados', 'Contabilidad: marque lo ya pagado y descargue el Excel actualizado']];
-    items = items.filter(function (it) { return puedeMod(it[0]) && (it[0] !== 'aplic' || esAdmin() || window.MX_ROLE === 'contable'); });
+    var items = [['caja', 'Flujo de caja', 'Disponible, pagos, cobros, bancos y proyección'], ['disp', 'Disponible real en efectivo', 'Lo que hay en bancos y caja menos los pagos autorizados'], ['ventas', 'Ventas e ingresos', 'Ventas por día y por punto, impoconsumo y otros ingresos'], ['egresos', 'Egresos y gastos', 'Todo lo causado por mes, semana o periodo, pagado y sin pagar'], ['pagar', 'Cuentas por pagar', 'Pendientes por proveedor y por semana, pagas y sin pagar'], ['prog', 'Programación de pagos', 'Lo programado para pagar cada semana, con su detalle'], ['auth', 'Pagos autorizados', 'Autorice los pagos de la semana y genere el informe para imprimir'], ['comp', 'Programado vs pagado', 'Lo programado de la semana frente a lo que ya figura pagado y lo que falta'], ['aplic', 'Aplicación de pagos aprobados', 'Contabilidad: marque lo ya pagado y descargue el Excel actualizado']];
+    items = items.filter(function (it) { return puedeMod(it[0]) && (it[0] !== 'aplic' || (APLIC_VISIBLE && (esAdmin() || window.MX_ROLE === 'contable'))); });
     if (esAdmin()) items.push(['users', 'Administración de usuarios', 'Crear, editar y eliminar usuarios']);
     items.push(['salir', 'Salir', 'Cerrar sesión y volver al ingreso']);
     gate.innerHTML = '\x3cdiv class="scr scr-menu">\x3cheader class="mh">\x3cdiv class="mh-img" role="img" aria-label="La Matriarca Barranquilla · Tesorería · Control de caja">\x3c/div>\x3c/header>\x3cdiv class="mh-body">\x3cdiv class="scr-in">\x3cdiv class="m-hi">\x3csmall>Bienvenido\x3c/small>\x3cb>' + esc(quien()) + '\x3c/b>\x3cspan>' + esc(ROLES[window.MX_ROLE] || '') + '\x3c/span>\x3c/div>' +
       (msg ? '\x3cp class="g-ok">' + esc(msg) + '\x3c/p>' : '') +
-      '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + (/^(disp|ventas|egresos|pagar|prog|auth|aplic)$/.test(it[0]) ? ' m-main' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
+      '\x3cnav class="m-grid">' + items.map(function (it) { return '\x3cbutton class="m-tile' + (it[0] === 'salir' ? ' m-out' : '') + (/^(disp|ventas|egresos|pagar|prog|auth|comp|aplic)$/.test(it[0]) ? ' m-main' : '') + '" data-ir="' + it[0] + '">\x3cspan class="m-ic">' + icono(it[0]) + '\x3c/span>\x3cb>' + it[1] + '\x3c/b>\x3csmall>' + it[2] + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/nav>' +
       (esAdmin() ? '' : '\x3cbutton class="g-link" type="button" data-ir="clave">Cambiar mi contraseña\x3c/button>') +
       '\x3cp class="g-ver">Versión ' + esc(window.MX_VERSION || '') + '\x3c/p>\x3c/div>\x3c/div>\x3c/div>';
     gate.querySelectorAll('[data-ir]').forEach(function (b) { b.onclick = function () { b.dataset.ir === 'salir' ? cerrar() : ir(b.dataset.ir); }; });
@@ -3528,8 +3609,8 @@ if (typeof module !== 'undefined') module.exports = MX;
   function bindBarra() { $('g-back').onclick = function () { ir('menu'); }; $('g-exit').onclick = cerrar; }
   function cerrar() { marcar(false); auth.signOut().then(function () { history.replaceState(null, '', location.pathname); location.reload(); }); }
   function pintar(v) {
-    if (/^(caja|disp|ventas|egresos|pagar|prog|auth|aplic)$/.test(v) && !puedeMod(v)) return menu('No tiene acceso a ese módulo.');
-    if (v === 'caja' || v === 'disp' || v === 'ventas' || v === 'egresos' || v === 'pagar' || v === 'prog' || v === 'auth' || v === 'aplic') abrirCaja(v);
+    if (/^(caja|disp|ventas|egresos|pagar|prog|auth|comp|aplic)$/.test(v) && !puedeMod(v)) return menu('No tiene acceso a ese módulo.');
+    if (v === 'caja' || v === 'disp' || v === 'ventas' || v === 'egresos' || v === 'pagar' || v === 'prog' || v === 'auth' || v === 'comp' || v === 'aplic') abrirCaja(v);
     else if (v === 'usuarios' && esAdmin()) modUsuarios();
     else if (v === 'clave') { cambiarClave(false, function (m) { ir('menu', m); }); }
     else menu(arguments[1]);

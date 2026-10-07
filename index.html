@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 6.7
+  Flujo de Caja La Matriarca — versión 6.8
 
   HISTORIAL DE VERSIONES
+  v6.8 (7 oct 2026) — Programado vs pagado: cada grupo y proveedor muestra, en renglones
+    separados y alineados, «Total programado», «Pagado» y «Falta por pagar» (etiqueta a la
+    izquierda, valor a la derecha, sin que se peguen ni se crucen).
   v6.7 (7 oct 2026) — Programado vs pagado: los totales de cada grupo y proveedor ahora
     siguen el filtro. «Ya pagados» suma solo lo pagado (cuadra con el resumen de arriba),
     «Faltan por pagar» suma solo lo pendiente y «Todos» muestra programado, pagado y falta.
@@ -328,7 +331,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="6.7">
+<meta name="version" content="6.8">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -345,7 +348,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "6.7";
+window.MX_VERSION = "6.8";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -830,6 +833,19 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .st-parcial .cp-a em{background:#fbe8bd;color:#7a5410}
 .party .tot.cp-ok{color:#1f7a4d} .party .tot.cp-fa{color:#b03a2e}
 .party.apf[open]>summary .tot.cp-ok,.party.apf[open]>summary .tot.cp-fa{color:var(--accent-ink)}
+.cpsum{display:block!important}
+.cpsum .card-t{margin-bottom:6px}
+.cp-kv{margin:8px 0 0;padding:0;display:grid;gap:6px}
+.cp-kv>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line)}
+.cp-kv dt{font-size:14px;font-weight:600;color:var(--muted);margin:0}
+.cp-kv dd{margin:0;font-size:18px;font-weight:800;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.cp-kv .ok dd{color:#1f7a4d} .cp-kv .fa dd{color:#b03a2e}
+.party>summary .cp-kvp{grid-column:1 / -1;margin-top:4px}
+.party>summary .cp-kvp>div{border-top:1px solid rgba(255,255,255,.25);padding:4px 0}
+.party:not([open])>summary .cp-kvp>div{border-top-color:var(--line)}
+.party:not([open])>summary .cp-kvp dt{color:var(--muted)}
+.party[open]>summary .cp-kvp dt,.party[open]>summary .cp-kvp dd{color:var(--accent-ink)!important}
+.party>summary .cp-kvp dd{font-size:15px}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -2619,15 +2635,17 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     ['prov', 'serv', 'pers', 'gast', 'obl'].forEach(function (k) {
       var its = vis.filter(function (i) { return i.it.cat === k; }); if (!its.length) return;
       var cProg = sum(its, function (i) { return i.prog; }), cPag = sum(its, function (i) { return i.pag; }), cPend = sum(its, function (i) { return i.pend; }), cN = its.filter(function (i) { return !i.nc; }).length;
-      var cVal = fil === 'pag' ? cPag : cPend, cLbl = fil === 'pag' ? 'Pagado' : (fil === 'all' && cPend < 1 ? 'Al día' : 'Falta pagar');
-      var cSub = fil === 'all' ? cN + (cN === 1 ? ' pago' : ' pagos') + ' · programado ' + M(cProg) + ' · pagado ' + M(cPag) : cN + (cN === 1 ? ' factura' : ' facturas') + (fil === 'pag' ? ' con pago' : ' por pagar');
       var g = {}; its.forEach(function (i) { var kk = (i.it.tercero || '').toLowerCase(); (g[kk] = g[kk] || { name: i.it.tercero || '(sin nombre)', items: [] }).items.push(i); });
       var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      var kv = function (rows, cls) { return '\x3cdl class="cp-kv ' + (cls || '') + '">' + rows.map(function (r) { return '\x3cdiv class="' + (r[2] || '') + '">\x3cdt>' + r[0] + '\x3c/dt>\x3cdd>' + M(r[1]) + '\x3c/dd>\x3c/div>'; }).join('') + '\x3c/dl>'; };
+      var cRows = fil === 'all' ? [['Total programado', cProg], ['Pagado', cPag, 'ok'], ['Falta por pagar', cPend, cPend < 1 ? 'ok' : 'fa']] : fil === 'pag' ? [['Pagado', cPag, 'ok']] : [['Falta por pagar', cPend, 'fa']];
+      var cSub = cN + (cN === 1 ? (fil === 'all' ? ' pago' : ' factura') : (fil === 'all' ? ' pagos' : ' facturas')) + (fil === 'pag' ? ' con pago' : fil === 'pend' ? ' por pagar' : '');
       var bkey = 'cp|' + k + '|' + fil;
-      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + cSub + '\x3c/small>\x3c/div>\x3cdiv class="card-v">\x3csmall>' + cLbl + '\x3c/small>\x3cb>' + M(cVal) + '\x3c/b>\x3c/div>\x3c/summary>\x3cdiv class="ckl">' +
+      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s cpsum">\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + cSub + '\x3c/small>\x3c/div>' + kv(cRows) + '\x3c/summary>' +
+        '\x3cdiv class="ckl">' +
         gl.map(function (t) {
           var tp = sum(t.items, function (i) { return i.prog; }), tg = sum(t.items, function (i) { return i.pag; }), tf = sum(t.items, function (i) { return i.pend; }), tkey = 'cp|' + k + '|' + fil + '|' + t.name, tn = t.items.filter(function (i) { return !i.nc; }).length;
-          return '\x3cdetails class="party apf" data-k="' + esc(tkey) + '"' + (S.open[tkey] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot cp-' + (fil === 'pag' || tf < 1 ? 'ok' : 'fa') + '">' + (fil === 'pag' ? 'Pagado ' + M(tg) : tf < 1 ? 'Pagado ✔' : 'Falta ' + M(tf)) + '\x3c/span>\x3cspan class="sub">\x3cspan>' + tn + (tn === 1 ? ' factura' : ' facturas') + '\x3c/span>' + (fil === 'all' ? '\x3cspan>Programado ' + M(tp) + '\x3c/span>\x3cspan>Pagado ' + M(tg) + '\x3c/span>' : '') + '\x3c/span>\x3c/summary>\x3cdiv class="ckl">' +
+          return '\x3cdetails class="party apf" data-k="' + esc(tkey) + '"' + (S.open[tkey] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot cp-' + (fil === 'pag' || tf < 1 ? 'ok' : 'fa') + '">' + (fil === 'pag' ? 'Pagado ' + M(tg) : tf < 1 ? 'Pagado ✔' : 'Falta ' + M(tf)) + '\x3c/span>\x3cspan class="sub">\x3cspan>' + tn + (tn === 1 ? ' factura' : ' facturas') + '\x3c/span>\x3c/span>' + (fil === 'all' ? kv([['Programado', tp], ['Pagado', tg], ['Falta', tf]], 'cp-kvp') : '') + '\x3c/summary>\x3cdiv class="ckl">' +
             t.items.map(function (i) {
               var x = i.x || i.it, badge = i.est === 'pagado' ? 'Pagado' : i.est === 'parcial' ? 'Abono' : 'Falta';
               var l2 = i.nc ? 'Nota crédito' + (i.est === 'pagado' ? ' · ya aplicada' : ' · por aplicar') : 'Programado ' + M(i.prog) + (i.pag ? ' · Pagado ' + M(i.pag) + (i.fPago ? ' el ' + F(i.fPago) : '') : '') + (i.est === 'pagado' && !i.x ? ' · ya no aparece pendiente en el Excel' : '');

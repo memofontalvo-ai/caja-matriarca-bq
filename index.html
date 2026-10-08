@@ -1,8 +1,18 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 6.9
+  Flujo de Caja La Matriarca — versión 7.0
 
   HISTORIAL DE VERSIONES
+  v7.0 (8 oct 2026) — Varias programaciones de pago en la misma semana.
+    · En «Pagos autorizados» se puede guardar más de una programación por semana. Cada una
+      queda con su código (ej. PP-20261005-02), fecha y hora, quién la guardó y sus pagos.
+    · «＋ Nueva programación» muestra solo lo que falta: se descuentan los pagos que ya están
+      en otra programación de la semana y los que ya figuran pagados o cancelados en el Excel.
+    · Arriba hay un selector con todas las programaciones de la semana para escoger cuál ver,
+      editar, descargar en PDF o eliminar. Muestra también el total programado de la semana.
+    · «Programado vs pagado» permite ver «Todas juntas» o una programación en particular.
+    · El Disponible real descuenta la suma de todas las programaciones de la semana.
+    · La autorización que ya estaba guardada pasa a ser la primera programación (PP-…-01).
   v6.9 (7 oct 2026) — Programado vs pagado: informe en imagen (JPG) para socios.
     · Botones «Descargar informe (imagen JPG)» y «Compartir por WhatsApp» (arriba y al final).
     · La imagen tiene el tamaño de una pantalla de teléfono: avance en %, total programado,
@@ -335,7 +345,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="6.9">
+<meta name="version" content="7.0">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -352,7 +362,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "6.9";
+window.MX_VERSION = "7.0";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -852,6 +862,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .party>summary .cp-kvp dd{font-size:15px}
 .cp-bt{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
 .cp-bt .btn{flex:1 1 150px}
+/* v7.0 programaciones por semana */
+.ppbar{margin:8px 0 10px}.ppbar>small{display:block;font-weight:700;color:#4a554e;margin-bottom:6px}
+.ppch{display:flex;flex-wrap:wrap;gap:8px}
+.ppc{flex:1 1 150px;min-width:140px;text-align:left;background:#fff;border:1.5px solid #d6dbd3;border-radius:12px;padding:9px 11px;display:flex;flex-direction:column;gap:2px;font:inherit;color:#14231B;cursor:pointer}
+.ppc b{font-size:14px}.ppc span{font-size:13px;color:#33423a}.ppc small{font-size:11.5px;color:#6b756e}
+.ppc.on{border-color:#173D30;background:#EAF3EC;box-shadow:0 0 0 2px #173D3022}
+.ppc.nueva{border-style:dashed;justify-content:center}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1009,7 +1026,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   var pending = null; // {name} cuando se ve un Excel cargado sin guardar
   var M = MX.money, F = MX.fecha;
   var TABS = [['resumen', 'Resumen'], ['ventas', 'Ventas'], ['pagar', 'Por pagar'], ['cobrar', 'Por cobrar'], ['bancos', 'Bancos y cajas'], ['dia', 'Movimiento del día'], ['semanas', 'Semanas'], ['flujo', 'Próximos 14 días']];
-  var S = { tab: 'resumen', D: null, cat: 'all', est: 'pend', q: '', mCat: 'all', eMes: null, ePer: 'all', eDesde: null, eHasta: null, eCat: 'all', eEst: 'all', eVerTodo: false, pVista: 'pend', pCat: 'prov', pEst: 'all', pSem: null, gF: 'all', gOrd: 'venc', gPlazo: lsGet('mx-plazo') || '30', aWeek: null, aDocs: {}, aLoad: {}, aSel: {}, aInit: null, aFecha: null, aView: 'sel', gSem: null, gDia: null, gVer: 'sem', gCat: 'all', gEst: 'all', vPunto: 'all', vVista: 'dia', vRango: 'mes', vIco: 'reg', recaudo: null, reserva: null, open: {} };
+  var S = { tab: 'resumen', D: null, cat: 'all', est: 'pend', q: '', mCat: 'all', eMes: null, ePer: 'all', eDesde: null, eHasta: null, eCat: 'all', eEst: 'all', eVerTodo: false, pVista: 'pend', pCat: 'prov', pEst: 'all', pSem: null, gF: 'all', gOrd: 'venc', gPlazo: lsGet('mx-plazo') || '30', aWeek: null, aDocs: {}, aAll: {}, aN: {}, cProg: 0, aLoad: {}, aSel: {}, aInit: null, aFecha: null, aView: 'sel', gSem: null, gDia: null, gVer: 'sem', gCat: 'all', gEst: 'all', vPunto: 'all', vVista: 'dia', vRango: 'mes', vIco: 'reg', recaudo: null, reserva: null, open: {} };
   try { var t = localStorage.getItem('mx-tab'); if (t && TABS.some(function (x) { return x[0] === t; })) S.tab = t; } catch (e) {}
   try { var h = location.hash.replace('#', ''); if (h && TABS.some(function (x) { return x[0] === h; })) S.tab = h; } catch (e) {}
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -1464,12 +1481,54 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   function pendArm() { return MX.facturas(W).filter(function (x) { return x.estado === 'pend' || x.estado === 'abono' || (x.estado === 'nc' && x.saldo < -0.5); }); }
   function esNC(x) { return (x.valor != null && x.valor < -0.5) || (x.valor == null && x.saldo != null && x.saldo < -0.5); }
   function refDe(x) { if (x.cat === 'obl') return x.concepto || 'Cuota'; if (esNC(x) && x.factura && x.factura !== 'NO') return 'N.C. ' + (String(x.factura).replace(/^NCE?[-\s]*/i, '') || x.factura); return x.factura && x.factura !== 'NO' ? 'Fact. ' + x.factura : (x.concepto || 'sin ref.'); }
+  /* v7.0 Varias programaciones por semana: P1 = doc \x3clunes>, P2 = \x3clunes>_2 ... Cada una con su código */
+  var MAXPP = 6;
+  function ppId(wid, n) { return n > 1 ? wid + '_' + n : wid; }
+  function ppCod(lunes, n) { var d = MX.toJS(lunes), p = function (v) { return (v < 10 ? '0' : '') + v; }; return 'PP-' + d.getUTCFullYear() + p(d.getUTCMonth() + 1) + p(d.getUTCDate()) + '-' + p(n); }
+  function ppFecha(t) { try { return new Date(t).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }); } catch (e) { return ''; } }
+  function ppSync(id) {
+    var l = S.aAll[id] || [], n = S.aN[id], d = null;
+    l.forEach(function (x) { if (x.pn === n) d = x; });
+    if (!d && n !== 0) { d = l.length ? l[l.length - 1] : null; n = d ? d.pn : 0; }
+    S.aN[id] = n; S.aDocs[id] = d;
+  }
+  function ppPut(wid, docN) {
+    var l = (S.aAll[wid] || []).filter(function (x) { return x.pn !== docN.pn; }); l.push(docN); l.sort(function (a, b) { return a.pn - b.pn; });
+    S.aAll[wid] = l; S.aN[wid] = docN.pn; ppSync(wid);
+  }
+  function ppDel(wid, pn) { S.aAll[wid] = (S.aAll[wid] || []).filter(function (x) { return x.pn !== pn; }); S.aN[wid] = null; ppSync(wid); }
+  function ppTodas(id) {
+    var l = S.aAll[id]; if (!l || !l.length) return null; if (l.length === 1) return l[0];
+    var last = l[l.length - 1], d = { semana: id, lunes: l[0].lunes, items: [], total: 0, n: 0, por: last.por, guardadoISO: last.guardadoISO, fechaInforme: last.fechaInforme, codigo: 'Todas', virtual: true, np: l.length };
+    l.forEach(function (x) { d.items = d.items.concat(x.items); d.total += x.total; d.n += x.n; }); return d;
+  }
+  function ppVista(id) { var l = S.aAll[id]; if (!l || !l.length) return null; var n = S.cProg | 0; if (n) for (var i = 0; i < l.length; i++) if (l[i].pn === n) return l[i]; return ppTodas(id); }
+  /* Pendientes menos lo ya incluido en las OTRAS programaciones de la semana */
+  function pendLib(wid) {
+    var otr = {}, sel = S.aN[wid] | 0; (S.aAll[wid] || []).forEach(function (d) { if (d.pn !== sel) d.items.forEach(function (it) { otr[it.k] = 1; }); });
+    return pendArm().filter(function (x) { return !otr[aKey(x)]; });
+  }
+  function ppChips(wid, admin) {
+    var l = S.aAll[wid] || [], sel = S.aN[wid], tot = 0; if (!l.length && !admin) return '';
+    var h = '\x3cdiv class="ppbar no-print">\x3csmall>Programaciones de esta semana\x3c/small>\x3cdiv class="ppch">';
+    l.forEach(function (d) { tot += d.total; h += '\x3cbutton type="button" class="ppc' + (d.pn === sel ? ' on' : '') + '" data-pp="' + d.pn + '">\x3cb>' + esc(d.codigo) + '\x3c/b>\x3cspan>' + d.n + (d.n === 1 ? ' pago' : ' pagos') + ' · ' + M(d.total) + '\x3c/span>\x3csmall>' + esc(ppFecha(d.guardadoISO)) + '\x3c/small>\x3c/button>'; });
+    if (admin && l.length < MAXPP) h += '\x3cbutton type="button" class="ppc nueva' + (sel === 0 ? ' on' : '') + '" data-pp="0">\x3cb>＋ Nueva programación\x3c/b>\x3cspan>solo lo que falta por programar\x3c/span>\x3c/button>';
+    return h + '\x3c/div>' + (l.length > 1 ? '\x3cp class="meta" style="margin:6px 0 0">Total programado en la semana: \x3cb>' + M(tot) + '\x3c/b> en ' + l.length + ' programaciones\x3c/p>' : '') + '\x3c/div>';
+  }
   function aLoad(l) {
     var id = iso(l);
-    if (S.aDocs[id] !== undefined || S.aLoad[id]) return;
+    if (S.aAll[id] !== undefined || S.aLoad[id]) return;
     S.aLoad[id] = 1;
-    if (!window.MX_AUTH) { S.aDocs[id] = null; S.aLoad[id] = 0; return; }
-    window.MX_AUTH.get(id).then(function (d) { S.aDocs[id] = d || null; S.aLoad[id] = 0; render(); }).catch(function (e) { S.aDocs[id] = null; S.aLoad[id] = 0; S.err = 'No se pudo leer la autorización guardada: ' + (e && e.message || 'error'); render(); });
+    if (!window.MX_AUTH) { S.aAll[id] = []; S.aLoad[id] = 0; ppSync(id); return; }
+    var ps = [], err1 = null;
+    for (var n = 1; n <= MAXPP; n++) (function (n) {
+      ps.push(window.MX_AUTH.get(ppId(id, n)).then(function (d) { if (d) { d.pn = d.pn || n; d.codigo = d.codigo || ppCod(d.lunes != null ? d.lunes : l, d.pn); } return d || null; }, function (e) { if (n === 1) err1 = e; return null; }));
+    })(n);
+    Promise.all(ps).then(function (a) {
+      S.aAll[id] = a.filter(Boolean); S.aLoad[id] = 0; ppSync(id);
+      if (err1) S.err = 'No se pudo leer la autorización guardada: ' + (err1 && err1.message || 'error');
+      render();
+    });
   }
   /* v5.4 Rango de vencimiento de lo marcado (sirve aunque se marque a mano o con el calendario) */
   function rangoAut(dias, D) {
@@ -1497,7 +1556,8 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   function rangoDoc(doc) { if (doc.rango) return doc.rango; var r = rangoAut((doc.items || []).map(function (x) { return x.dias; }), doc.fechaInforme || authD()); return r ? r.largo : ''; }
   function autGuardar() {
     var D = authD(), plazo = +S.gPlazo || 0, L = S.aWeek, id = iso(L), prev = S.aDocs[id] || null;
-    var live = pendArm(), liveMap = {}; live.forEach(function (x) { liveMap[aKey(x)] = x; });
+    var pnN = prev ? prev.pn : (S.aAll[id] || []).reduce(function (m, x) { return Math.max(m, x.pn); }, 0) + 1; if (pnN > MAXPP) { alert('Ya hay ' + MAXPP + ' programaciones esta semana.'); return; }
+    var live = pendLib(id), liveMap = {}; live.forEach(function (x) { liveMap[aKey(x)] = x; });
     var items = [];
     syncNC(live);
     live.forEach(function (x) { var k = aKey(x); if (!S.aSel[k]) return; var v = x.saldo < 0 ? null : venceDe(x, plazo); items.push({ k: k, cat: x.cat, tercero: x.tercero, factura: x.factura || '', concepto: x.concepto || '', sub: x.sub || '', fDoc: x.fDoc || null, fProg: x.fProg || null, venc: v, dias: v != null ? D - v : null, saldo: Math.round(x.saldo), valor: Math.round(x.valor) }); });
@@ -1505,15 +1565,16 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var ord = { prov: 0, serv: 1, pers: 2, gast: 3, obl: 4 }; items.sort(function (a, b) { return ord[a.cat] - ord[b.cat] || (b.dias == null ? -9999 : b.dias) - (a.dias == null ? -9999 : a.dias); });
     var total = items.reduce(function (s, x) { return s + x.saldo; }, 0), por = window.MX_USERNAME || '', ahora = new Date().toISOString();
     var rg = rangoAut(items.filter(function (x) { return x.saldo >= 0; }).map(function (x) { return x.dias; }), D);
-    var docN = { semana: id, lunes: L, fechaPago: S.aFecha || null, items: items, total: total, n: items.length, por: por, guardadoISO: ahora, fechaInforme: W.fechaInforme || null, plazo: plazo, rango: rg ? rg.largo : '', rev: (prev && prev.rev || 0) + 1,
+    var docN = { semana: id, lunes: L, pn: pnN, codigo: (prev && prev.codigo) || ppCod(L, pnN), fechaPago: S.aFecha || null, items: items, total: total, n: items.length, por: por, guardadoISO: ahora, fechaInforme: W.fechaInforme || null, plazo: plazo, rango: rg ? rg.largo : '', rev: (prev && prev.rev || 0) + 1,
       hist: ((prev && prev.hist) || []).concat([{ en: ahora, por: por, n: items.length, total: total }]).slice(-20) };
     var b = document.getElementById('a-save'); if (b) { b.disabled = true; b.textContent = 'Guardando…'; }
-    window.MX_AUTH.save(id, docN).then(function () { S.aDocs[id] = docN; S.aInit = null; S.aView = 'rep'; Object.keys(S.open).forEach(function (k) { if (/^(ba|ap|br|rp|cp)\|/.test(k)) delete S.open[k]; }); S.err = null; window.scrollTo(0, 0); render(); }).catch(function (e) {
+    window.MX_AUTH.save(ppId(id, pnN), docN).then(function () { ppPut(id, docN); S.aInit = null; S.aView = 'rep'; Object.keys(S.open).forEach(function (k) { if (/^(ba|ap|br|rp|cp)\|/.test(k)) delete S.open[k]; }); S.err = null; window.scrollTo(0, 0); render(); }).catch(function (e) {
       S.err = (e && e.code === 'permission-denied') ? 'Su usuario no tiene permiso para guardar autorizaciones. Solo el administrador puede.' : 'No se pudo guardar la autorización: ' + (e && e.message || 'error desconocido'); render();
     });
   }
   function repProcesar() {
     var id = iso(S.aWeek), doc = S.aDocs[id], O = S.rOut || {}; if (!doc) return;
+    var pid = ppId(id, doc.pn);
     var quitar = doc.items.filter(function (x) { return O[x.k]; }); if (!quitar.length) return;
     var qT = quitar.reduce(function (t, x) { return t + x.saldo; }, 0);
     if (!confirm('¿Quitar ' + quitar.length + (quitar.length === 1 ? ' factura' : ' facturas') + ' (' + M(qT) + ') de esta programación?\nEl Excel no se modifica.')) return;
@@ -1524,21 +1585,21 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     docN.items = items; docN.total = total; docN.n = items.length; docN.retirados = ret; docN.rev = (doc.rev || 0) + 1; docN.modificadoISO = ahora; docN.modificadoPor = por;
     docN.hist = (doc.hist || []).concat([{ en: ahora, por: por, n: items.length, total: total, quito: quitar.length, quitoTotal: qT, motivo: motivo }]).slice(-20);
     var b = document.getElementById('r-proc'); if (b) { b.disabled = true; b.textContent = 'Guardando…'; }
-    window.MX_AUTH.save(id, docN).then(function () { S.aDocs[id] = docN; S.rOut = {}; S.err = null; render(); }).catch(function (e) {
+    window.MX_AUTH.save(pid, docN).then(function () { ppPut(id, docN); S.rOut = {}; S.err = null; render(); }).catch(function (e) {
       S.err = (e && e.code === 'permission-denied') ? 'Su usuario no tiene permiso para modificar autorizaciones. Solo el administrador puede.' : 'No se pudo guardar el cambio: ' + (e && e.message || 'error'); render();
     });
   }
   function autEliminar() {
     var id = iso(S.aWeek), doc = S.aDocs[id];
     if (!doc) return;
-    if (!confirm('¿Eliminar la autorización de la semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + '?\n\nSe borra el informe guardado (' + doc.n + (doc.n === 1 ? ' pago' : ' pagos') + ' · ' + M(doc.total) + ').\nLos datos del Excel no cambian y podrá volver a armar la autorización desde cero.\n\nEsto no se puede deshacer.')) return;
+    if (!confirm('¿Eliminar la programación ' + (doc.codigo || '') + ' de la semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + '?\n\nSe borra el informe guardado (' + doc.n + (doc.n === 1 ? ' pago' : ' pagos') + ' · ' + M(doc.total) + ').\nLos datos del Excel no cambian y podrá volver a armar la autorización desde cero.\n\nEsto no se puede deshacer.')) return;
     var b = document.querySelector('[data-adel]'); if (b) { b.disabled = true; b.textContent = 'Eliminando…'; }
-    window.MX_AUTH.del(id).then(function () { S.aDocs[id] = null; S.aSel = {}; S.aInit = null; S.aView = 'sel'; S.aRng = null; S.aHasta = null; S.rOut = {}; S.err = null; window.scrollTo(0, 0); render(); }).catch(function (e) {
+    window.MX_AUTH.del(ppId(id, doc.pn)).then(function () { var pn0 = doc.pn; ppDel(id, pn0); S.aSel = {}; S.aInit = null; S.aView = 'sel'; S.aRng = null; S.aHasta = null; S.rOut = {}; S.err = null; window.scrollTo(0, 0); render(); }).catch(function (e) {
       S.err = (e && e.code === 'permission-denied') ? 'Su usuario no tiene permiso para eliminar autorizaciones. Solo el administrador puede.' : 'No se pudo eliminar: ' + (e && e.message || 'error'); render();
     });
   }
   function textoAut(doc) {
-    var L = ['AUTORIZACIÓN DE PAGOS · La Matriarca', 'Semana: ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + MX.toJS(doc.lunes).getUTCFullYear(), doc.fechaPago ? 'Pagos para el ' + F(doc.fechaPago, true) : '', 'Autorizó: ' + (doc.por || '') + ' · ' + stampLargo(doc.guardadoISO), ''].filter(function (s, i) { return s !== '' || i === 4; });
+    var L = ['AUTORIZACIÓN DE PAGOS · La Matriarca', 'Semana: ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + MX.toJS(doc.lunes).getUTCFullYear(), doc.codigo ? 'Programación: ' + doc.codigo : '', doc.fechaPago ? 'Pagos para el ' + F(doc.fechaPago, true) : '', 'Autorizó: ' + (doc.por || '') + ' · ' + stampLargo(doc.guardadoISO), ''].filter(function (s, i) { return s !== '' || i === 4; });
     Object.keys(CATN).forEach(function (k) {
       var its = doc.items.filter(function (x) { return x.cat === k; }); if (!its.length) return;
       L.push('== ' + CATN[k].toUpperCase() + ' ==');
@@ -1559,16 +1620,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var L = S.aWeek, id = iso(L);
     aLoad(L);
     var doc = S.aDocs[id], cargando = doc === undefined;
-    var live = pendArm(), liveMap = {}; live.forEach(function (x) { liveMap[aKey(x)] = x; });
-    if (!cargando && S.aInit !== id) {
-      S.aInit = id; S.aSel = {}; if (doc) doc.items.forEach(function (it) { S.aSel[it.k] = 1; });
+    var live = pendLib(id), liveMap = {}; live.forEach(function (x) { liveMap[aKey(x)] = x; });
+    var ik = id + '#' + S.aN[id];
+    if (!cargando && S.aInit !== ik) {
+      S.aInit = ik; S.rOut = {}; S.aSel = {}; if (doc) doc.items.forEach(function (it) { S.aSel[it.k] = 1; });
       S.aFecha = doc && doc.fechaPago || null; S.aView = admin && !doc ? 'sel' : (doc ? 'rep' : 'sel');
     }
     var view = admin ? S.aView : 'rep';
     function nD(n) { return n + (n === 1 ? ' pago' : ' pagos'); }
     var h = '\x3cdiv class="weeknav">\x3cbutton class="btn" id="a-prev" aria-label="Semana anterior">‹ Anterior\x3c/button>\x3cdiv class="weeknav-t">\x3csmall>' + (L === hoyL ? 'Semana actual' : L === hoyL - 7 ? 'Semana anterior' : L === hoyL + 7 ? 'Semana siguiente' : 'Semana') + '\x3c/small>\x3cb>Lun ' + F(L) + ' – dom ' + F(L + 6) + '\x3c/b>\x3c/div>\x3cbutton class="btn" id="a-next" aria-label="Semana siguiente">Siguiente ›\x3c/button>\x3c/div>';
     if (cargando) return h + '\x3cdiv class="panel empty">Cargando la autorización de esta semana…\x3c/div>';
-    h += '\x3cdiv class="banner' + (doc ? '' : ' warn') + '">\x3cspan>' + (doc ? '\x3cb>Autorización guardada\x3c/b> · ' + nD(doc.n) + ' · ' + M(doc.total) + '\x3cbr>\x3cspan class="meta">por ' + esc(doc.por || '') + ' · ' + esc(stampLargo(doc.guardadoISO)) + (doc.rev > 1 ? ' · versión ' + doc.rev : '') + '\x3c/span>' : 'Todavía no hay pagos autorizados para esta semana.') + '\x3c/span>\x3c/div>';
+    h += ppChips(id, admin);
+    h += '\x3cdiv class="banner' + (doc ? '' : ' warn') + '">\x3cspan>' + (doc ? '\x3cb>Programación ' + esc(doc.codigo || '') + ' guardada\x3c/b> · ' + nD(doc.n) + ' · ' + M(doc.total) + '\x3cbr>\x3cspan class="meta">por ' + esc(doc.por || '') + ' · ' + esc(stampLargo(doc.guardadoISO)) + (doc.rev > 1 ? ' · versión ' + doc.rev : '') + '\x3c/span>' : ((S.aAll[id] || []).length ? '\x3cb>Nueva programación\x3c/b> (código ' + ppCod(L, (S.aAll[id] || []).reduce(function (m, x) { return Math.max(m, x.pn); }, 0) + 1) + '). Aquí solo salen los pagos pendientes que no están en otra programación de la semana ni figuran pagados.' : 'Todavía no hay pagos autorizados para esta semana.')) + '\x3c/span>\x3c/div>';
     if (admin) h += '\x3cdiv class="filters">' + seg('aView', [['sel', 'Autorizar pagos'], ['rep', 'Informe guardado']]) + '\x3c/div>';
     if (view === 'rep') return h + vAuthRep(doc, liveMap, admin);
     // ---- Autorizar ----
@@ -1584,7 +1647,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var savedKeys = doc ? doc.items.map(function (it) { return it.k; }).sort().join('~') : '', curKeys = Object.keys(S.aSel).sort().join('~');
     var sucio = savedKeys !== curKeys || (doc && (doc.fechaPago || null) !== (S.aFecha || null));
     h += '\x3cp class="note" style="margin:0">Chulee los pagos que autoriza para esta semana y toque \x3cb>Guardar autorización\x3c/b>. Esto no cambia el Excel; queda guardado aquí y genera el informe.\x3c/p>';
-    h += card({ icon: 'deuda', title: 'Lo pendiente por pagar', sub: 'Al ' + F(D, true) + ' · toque para filtrar',
+    h += card({ icon: 'deuda', title: 'Lo pendiente por pagar', sub: 'Al ' + F(D, true) + ((S.aAll[id] || []).length > (doc ? 1 : 0) ? ' · sin lo ya programado esta semana' : '') + ' · toque para filtrar',
       body: [['venc', 'Vencidas', venc], ['prox', 'Vencen en 7 días o menos', prox], ['mas', 'Vencen después', mas], ['sinv', 'Sin fecha de vencimiento', sinv]].concat(ncs.length ? [['nc', 'Notas crédito (se descuentan)', ncs]] : []).map(function (r) {
         return '\x3cbutton class="row row-btn row-2' + (S.gF === r[0] ? ' on' : '') + '" data-gf="' + r[0] + '">\x3cspan>' + r[1] + ' ›\x3csmall>' + (r[0] === 'nc' ? r[2].length + (r[2].length === 1 ? ' nota crédito' : ' notas crédito') : nD(r[2].length).replace('pago', 'factura')) + (r[0] === 'venc' && r[2].length ? ' · la más vieja ' + Math.max.apply(null, r[2].map(function (i) { return i.d; })) + ' días' : '') + '\x3c/small>\x3c/span>' + amt(suma(r[2])) + '\x3c/button>';
       }).join(''), totalLbl: 'Total pendiente', total: suma(items) });
@@ -1726,7 +1789,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       X.rect(P, ML, 28, CW, 2.5, VERDE);
       X.text(P, ML, 44, 'LA MATRIARCA · TESORERÍA  ·  ' + tituloH + (cont ? ' (continuación)' : ''), { size: 9.5, bold: 1 });
       X.text(P, PW - ML, 44, esPaq ? 'PAQUETE ' + paq : semTxt, { size: 10, bold: 1, align: 'r', color: esPaq ? VERDE : [0, 0, 0] });
-      var meta = semTxt + '   ·   Autorizó: ' + (doc.por || '') + '   ·   Guardado: ' + stampLargo(doc.guardadoISO) + (doc.fechaPago ? '   ·   Pagos para el: ' + fnum(doc.fechaPago) : '');
+      var meta = semTxt + (doc.codigo ? '   ·   Programación: ' + doc.codigo : '') + '   ·   Autorizó: ' + (doc.por || '') + '   ·   Guardado: ' + stampLargo(doc.guardadoISO) + (doc.fechaPago ? '   ·   Pagos para el: ' + fnum(doc.fechaPago) : '');
       X.text(P, ML, 56, meta, { size: 7.5, color: MUT });
       X.line(P, ML, 62, PW - ML, 62, 0.6, [0.6, 0.6, 0.6]);
       y = 72;
@@ -1854,7 +1917,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     nuevaHoja(false, 'Consolidado final de pagos autorizados', false);
     var totV = grupos.reduce(function (s2, g) { return s2 + g.lst.reduce(function (s3, t) { return s3 + t.nv; }, 0); }, 0);
     // datos de la autorización
-    var info = [['Periodo', semTxt.replace('Semana ', 'Semana del ')], ['Autorizó', doc.por || '-'], ['Guardado', stampLargo(doc.guardadoISO)], ['Pagos para el', doc.fechaPago ? fnum(doc.fechaPago) : 'Sin fecha definida'], ['Datos del Excel', doc.fechaInforme ? 'Informe del ' + fnum(doc.fechaInforme) : '-'], ['Facturas autorizadas', doc.n + (totV ? '  (' + totV + ' vencidas)' : '')]];
+    var info = [['Programación', doc.codigo || '-'], ['Periodo', semTxt.replace('Semana ', 'Semana del ')], ['Autorizó', doc.por || '-'], ['Guardado', stampLargo(doc.guardadoISO)], ['Pagos para el', doc.fechaPago ? fnum(doc.fechaPago) : 'Sin fecha definida'], ['Datos del Excel', doc.fechaInforme ? 'Informe del ' + fnum(doc.fechaInforme) : '-'], ['Facturas autorizadas', doc.n + (totV ? '  (' + totV + ' vencidas)' : '')]];
     var rgT = rangoDoc(doc), bH = rgT ? 67 : 46;
     X.rect(P, ML, y, CW, bH, [0.95, 0.96, 0.95]); X.rect(P, ML, y, 3, bH, VERDE);
     if (rgT) { X.text(P, ML + 12, y + 53, 'RANGO DE VENCIMIENTO', { size: 6.5, bold: 1, color: MUT }); X.text(P, ML + 12, y + 61.5, rgT, { size: 8, bold: 1 }); }
@@ -1910,7 +1973,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   function pdfBaja(blob, nombre) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(function () { document.body.removeChild(a); }, 500); }
   function vDisp(R) {
     var L = MX.lunesDe(authD()), id = iso(L); aLoad(L);
-    var doc = S.aDocs[id], cargando = doc === undefined, im = W.impuestos || {};
+    var doc = ppTodas(id), cargando = S.aAll[id] === undefined, im = W.impuestos || {};
     var caja = R.real.total, mega = R.mega.saldo, total = caja + mega;
     var g = { prov: [0, 0], pers: [0, 0], serv: [0, 0], gast: [0, 0], obl: [0, 0] };
     if (doc) doc.items.forEach(function (x) { var a = g[x.cat]; if (a) { a[0] += x.saldo; a[1]++; } });
@@ -2038,12 +2101,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (!doc) return '\x3cdiv class="panel empty">' + (admin ? 'Aún no ha guardado una autorización para esta semana. Entre a “Autorizar pagos”.' : 'El administrador todavía no ha autorizado pagos para esta semana.') + '\x3c/div>';
     var year = MX.toJS(doc.lunes).getUTCFullYear();
     var h = '\x3csection class="rep" id="rep-auth">\x3cheader class="rep-h">\x3csmall>La Matriarca · Tesorería\x3c/small>\x3ch2>Autorización de pagos\x3c/h2>' +
-      '\x3cdiv class="rep-meta">\x3cspan>\x3csmall>Semana\x3c/small>\x3cb>' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + year + '\x3c/b>\x3c/span>' +
+      '\x3cdiv class="rep-meta">' + (doc.codigo ? '\x3cspan>\x3csmall>Programación\x3c/small>\x3cb>' + esc(doc.codigo) + '\x3c/b>\x3c/span>' : '') + '\x3cspan>\x3csmall>Semana\x3c/small>\x3cb>' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + year + '\x3c/b>\x3c/span>' +
       (doc.fechaPago ? '\x3cspan>\x3csmall>Pagos para el\x3c/small>\x3cb>' + F(doc.fechaPago, true) + '\x3c/b>\x3c/span>' : '') +
       '\x3cspan>\x3csmall>Autorizó\x3c/small>\x3cb>' + esc(doc.por || '') + '\x3c/b>\x3c/span>\x3cspan>\x3csmall>Guardado\x3c/small>\x3cb>' + esc(stampLargo(doc.guardadoISO)) + '\x3c/b>\x3c/span>' +
       '\x3cspan>\x3csmall>Pagos\x3c/small>\x3cb>' + doc.n + '\x3c/b>\x3c/span>\x3cspan>\x3csmall>Total\x3c/small>\x3cb>' + M(doc.total) + '\x3c/b>\x3c/span>\x3c/div>' + (rangoDoc(doc) ? '\x3cp class="rep-rng">\x3csmall>Rango de vencimiento\x3c/small> \x3cb>' + esc(rangoDoc(doc)) + '\x3c/b>\x3c/p>' : '') + '\x3c/header>';
     var pagadas = 0, pagadasT = 0, RK = [];
-    if (S._rOutId !== doc.semana) { S._rOutId = doc.semana; S.rOut = {}; }
+    if (S._rOutId !== doc.semana + '#' + doc.pn) { S._rOutId = doc.semana + '#' + doc.pn; S.rOut = {}; }
     var OUT = S.rOut || (S.rOut = {});
     function inc(x) { return !OUT[x.k]; }
     function sm(a) { return a.reduce(function (t, x) { return t + (inc(x) ? x.saldo : 0); }, 0); }
@@ -2499,10 +2562,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var ga = root.querySelector('[data-gall]'); if (ga) ga.onclick = function () { root.querySelectorAll('[data-ak]').forEach(function (c) { S.aSel[c.dataset.ak] = 1; }); render(); };
     var gn = root.querySelector('[data-gnone]'); if (gn) gn.onclick = function () { if (confirm('¿Quitar todas las marcas de la lista?')) { S.aSel = {}; render(); } };
     var apf = document.getElementById('a-pf'); if (apf) apf.onchange = function () { S.aFecha = apf.value ? fromIso(apf.value) : null; render(); };
-    var apv = document.getElementById('a-prev'); if (apv) apv.onclick = function () { S.aWeek -= 7; S.aInit = null; render(); };
-    var anx = document.getElementById('a-next'); if (anx) anx.onclick = function () { S.aWeek += 7; S.aInit = null; render(); };
+    var apv = document.getElementById('a-prev'); if (apv) apv.onclick = function () { S.aWeek -= 7; S.aInit = null; S.cProg = 0; render(); };
+    var anx = document.getElementById('a-next'); if (anx) anx.onclick = function () { S.aWeek += 7; S.aInit = null; S.cProg = 0; render(); };
     var asv = document.getElementById('a-save'); if (asv) asv.onclick = autGuardar;
     var adl = root.querySelector('[data-adel]'); if (adl) adl.onclick = autEliminar;
+    root.querySelectorAll('[data-pp]').forEach(function (b) { b.onclick = function () { var wid = iso(S.aWeek); S.aN[wid] = +b.dataset.pp; ppSync(wid); S.aInit = null; S.aSel = {}; S.rOut = {}; S.err = null; S.aView = S.aN[wid] ? 'rep' : 'sel'; render(); }; });
+    root.querySelectorAll('[data-cpp]').forEach(function (b) { b.onclick = function () { S.cProg = +b.dataset.cpp; render(); }; });
     apBind();
     root.querySelectorAll('[data-ropen]').forEach(function (b) { b.onclick = function () { var v = b.dataset.ropen === '1'; (S._rk || []).forEach(function (k) { S.open[k] = v; }); render(); }; });
     root.querySelectorAll('input.rck').forEach(function (c) {
@@ -2589,7 +2654,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   }
   /* Lista de pagos aprobados que siguen pendientes en el Excel subido */
   function apItems() {
-    var A = S.ap, id = iso(S.aWeek), doc = S.aDocs[id];
+    var A = S.ap, id = iso(S.aWeek), doc = ppTodas(id);
     if (!A || !doc) return { doc: doc, items: [], ya: 0 };
     var map = {}; MX.facturas(W).forEach(function (x) { map[aKey(x)] = x; });
     var items = [], ya = 0;
@@ -2633,7 +2698,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       prog: sum(all, function (i) { return i.prog; }), pag: sum(all, function (i) { return i.pag; }), pend: sum(all, function (i) { return i.pend; }),
       n: pagos.length, nPag: pagos.filter(function (i) { return i.est === 'pagado'; }).length, nPar: pagos.filter(function (i) { return i.est === 'parcial'; }).length, nPen: pagos.filter(function (i) { return i.est === 'pend'; }).length,
       cats: cats, terc: terc,
-      nota: 'Programación autorizada por ' + (doc.por || '') + ', guardada ' + String(stampLargo(doc.guardadoISO)).replace(/\.$/, '') + '. Lo pagado es lo que contabilidad registró en el Excel del informe del ' + F(W.fechaInforme, true) + '. Un pago con abono parcial se cuenta por lo abonado.'
+      nota: (doc.virtual ? 'Suma de ' + doc.np + ' programaciones de la semana. ' : (doc.codigo ? 'Programación ' + doc.codigo + '. ' : '')) + 'Autorizada por ' + (doc.por || '') + ', guardada ' + String(stampLargo(doc.guardadoISO)).replace(/\.$/, '') + '. Lo pagado es lo que contabilidad registró en el Excel del informe del ' + F(W.fechaInforme, true) + '. Un pago con abono parcial se cuenta por lo abonado.'
     };
   }
   function imgCompBlob(cb) {
@@ -2725,10 +2790,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (S.aWeek == null) S.aWeek = hoyL;
     var L = S.aWeek, id = iso(L);
     aLoad(L);
-    var doc = S.aDocs[id];
+    var doc = S.aAll[id] === undefined ? undefined : ppVista(id);
     var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Programado vs pagado\x3c/h2>\x3cspan class="meta">Lo autorizado de la semana frente a lo que ya figura pagado en el Excel\x3c/span>\x3c/div>\x3c/div>';
     h += '\x3cdiv class="weeknav">\x3cbutton class="btn" id="a-prev" aria-label="Semana anterior">‹ Anterior\x3c/button>\x3cdiv class="weeknav-t">\x3csmall>' + (L === hoyL ? 'Semana actual' : L === hoyL - 7 ? 'Semana anterior' : L === hoyL + 7 ? 'Semana siguiente' : 'Semana') + '\x3c/small>\x3cb>Lun ' + F(L) + ' – dom ' + F(L + 6) + '\x3c/b>\x3c/div>\x3cbutton class="btn" id="a-next" aria-label="Semana siguiente">Siguiente ›\x3c/button>\x3c/div>';
     if (doc === undefined) return h + '\x3cdiv class="panel empty">Cargando la programación de esta semana…\x3c/div>';
+    var lp = S.aAll[id] || [];
+    if (lp.length > 1) h += '\x3cdiv class="ppbar no-print">\x3csmall>¿Qué programación quiere ver?\x3c/small>\x3cdiv class="ppch">\x3cbutton type="button" class="ppc' + (doc.virtual ? ' on' : '') + '" data-cpp="0">\x3cb>Todas juntas\x3c/b>\x3cspan>' + lp.length + ' programaciones · ' + M(lp.reduce(function (t, x) { return t + x.total; }, 0)) + '\x3c/span>\x3c/button>' + lp.map(function (d) { return '\x3cbutton type="button" class="ppc' + (!doc.virtual && doc.pn === d.pn ? ' on' : '') + '" data-cpp="' + d.pn + '">\x3cb>' + esc(d.codigo) + '\x3c/b>\x3cspan>' + d.n + (d.n === 1 ? ' pago' : ' pagos') + ' · ' + M(d.total) + '\x3c/span>\x3csmall>' + esc(ppFecha(d.guardadoISO)) + '\x3c/small>\x3c/button>'; }).join('') + '\x3c/div>\x3c/div>';
     if (!doc) return h + '\x3cdiv class="panel empty">Para esta semana todavía no hay una programación autorizada guardada.\x3c/div>';
     var all = compItems(doc), fil = S.cFil || 'all';
     var sum = function (arr, f) { return arr.reduce(function (s, i) { return s + f(i); }, 0); };
@@ -2738,7 +2805,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var pct = tProg > 0 ? Math.max(0, Math.min(100, Math.round(tPag / tProg * 100))) : 0;
     S._cp = compModelo(doc, all);
     var btnImg = '\x3cdiv class="cp-bt no-print">\x3cbutton type="button" class="btn pri" data-cimg="dl">Descargar informe (imagen JPG)\x3c/button>\x3cbutton type="button" class="btn" data-cimg="sh">Compartir por WhatsApp\x3c/button>\x3c/div>';
-    h += '\x3cdiv class="banner">\x3cspan>\x3cb>Programación guardada\x3c/b> · ' + pagos.length + (pagos.length === 1 ? ' pago' : ' pagos') + ' · ' + M(doc.total) + '\x3cbr>\x3cspan class="meta">por ' + esc(doc.por || '') + ' · ' + esc(stampLargo(doc.guardadoISO)) + '\x3cbr>Comparada con el Excel del informe del ' + F(W.fechaInforme, true) + '\x3c/span>\x3c/span>\x3c/div>';
+    h += '\x3cdiv class="banner">\x3cspan>\x3cb>' + (doc.virtual ? 'Todas las programaciones (' + doc.np + ')' : 'Programación ' + esc(doc.codigo || '') + ' guardada') + '\x3c/b> · ' + pagos.length + (pagos.length === 1 ? ' pago' : ' pagos') + ' · ' + M(doc.total) + '\x3cbr>\x3cspan class="meta">' + (doc.virtual ? 'última guardada por ' : 'por ') + esc(doc.por || '') + ' · ' + esc(stampLargo(doc.guardadoISO)) + '\x3cbr>Comparada con el Excel del informe del ' + F(W.fechaInforme, true) + '\x3c/span>\x3c/span>\x3c/div>';
     h += '\x3cdiv class="panel cp-sum">\x3cdiv class="cp-cols">\x3cdiv>\x3csmall>Programado\x3c/small>\x3cb>' + M(tProg) + '\x3c/b>\x3cspan class="meta">' + pagos.length + ' pagos\x3c/span>\x3c/div>\x3cdiv class="ok">\x3csmall>Pagado\x3c/small>\x3cb>' + M(tPag) + '\x3c/b>\x3cspan class="meta">' + nPag + ' completos' + (nPar ? ' · ' + nPar + ' con abono' : '') + '\x3c/span>\x3c/div>\x3cdiv class="' + (tPend > 0.5 ? 'fa' : 'ok') + '">\x3csmall>Falta pagar\x3c/small>\x3cb>' + M(tPend) + '\x3c/b>\x3cspan class="meta">' + (nPen + nPar) + ' pendientes\x3c/span>\x3c/div>\x3c/div>' +
       '\x3cdiv class="bar-pct" role="img" aria-label="' + pct + '% pagado">\x3ci style="width:' + pct + '%">\x3c/i>\x3c/div>\x3cp class="note" style="margin:0">' + (tPend < 1 ? '\x3cb>Todo lo programado ya figura pagado.\x3c/b>' : 'De ' + M(tProg) + ' programados ya figuran pagados \x3cb>' + M(tPag) + '\x3c/b> (' + pct + '%). Faltan \x3cb>' + M(tPend) + '\x3c/b>.') + '\x3c/p>\x3c/div>';
     h += btnImg;

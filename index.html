@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 8.1
+  Flujo de Caja La Matriarca — versión 8.2
 
   HISTORIAL DE VERSIONES
+  v8.2 (9 oct 2026) — Pagos autorizados: botón para editar una programación guardada.
+    · En el informe guardado hay un botón «Editar y agregar pagos»: vuelve a mostrar todos los
+      pendientes, con los ya autorizados marcados, para agregar más y «Guardar cambios».
+    · La pestaña pasa a llamarse «Editar / agregar pagos» cuando ya hay una programación.
   v8.1 (9 oct 2026) — Full cost: compras a crédito, de contado, notas crédito y efectivo.
     · El full cost suma todas las compras de proveedores (crédito y contado), resta las notas
       crédito y suma las compras de insumos pagadas en efectivo por caja.
@@ -399,7 +403,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="8.1">
+<meta name="version" content="8.2">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -416,7 +420,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "8.1";
+window.MX_VERSION = "8.2";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1708,7 +1712,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (cargando) return h + '\x3cdiv class="panel empty">Cargando la autorización de esta semana…\x3c/div>';
     h += ppChips(id, admin);
     h += '\x3cdiv class="banner' + (doc ? '' : ' warn') + '">\x3cspan>' + (doc ? '\x3cb>Programación ' + esc(doc.codigo || '') + ' guardada\x3c/b> · ' + nD(doc.n) + ' · ' + M(doc.total) + '\x3cbr>\x3cspan class="meta">por ' + esc(doc.por || '') + ' · ' + esc(stampLargo(doc.guardadoISO)) + (doc.rev > 1 ? ' · versión ' + doc.rev : '') + '\x3c/span>' : ((S.aAll[id] || []).length ? '\x3cb>Nueva programación\x3c/b> (código ' + ppCod(L, (S.aAll[id] || []).reduce(function (m, x) { return Math.max(m, x.pn); }, 0) + 1) + '). Aquí solo salen los pagos pendientes que no están en otra programación de la semana ni figuran pagados.' : 'Todavía no hay pagos autorizados para esta semana.')) + '\x3c/span>\x3c/div>';
-    if (admin) h += '\x3cdiv class="filters">' + seg('aView', [['sel', 'Autorizar pagos'], ['rep', 'Informe guardado']]) + '\x3c/div>';
+    if (admin) h += '\x3cdiv class="filters">' + seg('aView', [['sel', doc ? 'Editar / agregar pagos' : 'Autorizar pagos'], ['rep', 'Informe guardado']]) + '\x3c/div>';
     if (view === 'rep') return h + vAuthRep(doc, liveMap, admin);
     // ---- Autorizar ----
     var items = live.map(function (x) { var nc = x.saldo < 0, v = nc ? null : venceDe(x, plazo); return { x: x, k: aKey(x), v: v, d: v != null ? D - v : null, nc: nc }; });
@@ -1722,7 +1726,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var venc = items.filter(function (i) { return i.d != null && i.d > 0; }), prox = items.filter(function (i) { return i.d != null && i.d <= 0 && i.d >= -7; }), mas = items.filter(function (i) { return i.d != null && i.d < -7; }), sinv = items.filter(function (i) { return i.d == null && !i.nc; }), ncs = items.filter(function (i) { return i.nc; });
     var savedKeys = doc ? doc.items.map(function (it) { return it.k; }).sort().join('~') : '', curKeys = Object.keys(S.aSel).sort().join('~');
     var sucio = savedKeys !== curKeys || (doc && (doc.fechaPago || null) !== (S.aFecha || null));
-    h += '\x3cp class="note" style="margin:0">Chulee los pagos que autoriza para esta semana y toque \x3cb>Guardar autorización\x3c/b>. Esto no cambia el Excel; queda guardado aquí y genera el informe.\x3c/p>';
+    h += doc ? '\x3cdiv class="banner">\x3cspan>\x3cb>Editando la programación ' + esc(doc.codigo || '') + '\x3c/b>\x3cbr>\x3cspan class="meta">Los ' + nD(doc.n) + ' ya autorizados salen marcados. Chulee los que faltan (o quite el chulito a los que no van) y toque \x3cb>Guardar cambios\x3c/b> abajo. Esto no cambia el Excel.\x3c/span>\x3c/span>\x3c/div>' : '\x3cp class="note" style="margin:0">Chulee los pagos que autoriza para esta semana y toque \x3cb>Guardar autorización\x3c/b>. Esto no cambia el Excel; queda guardado aquí y genera el informe.\x3c/p>';
     h += card({ icon: 'deuda', title: 'Lo pendiente por pagar', sub: 'Al ' + F(D, true) + ((S.aAll[id] || []).length > (doc ? 1 : 0) ? ' · sin lo ya programado esta semana' : '') + ' · toque para filtrar',
       body: [['venc', 'Vencidas', venc], ['prox', 'Vencen en 7 días o menos', prox], ['mas', 'Vencen después', mas], ['sinv', 'Sin fecha de vencimiento', sinv]].concat(ncs.length ? [['nc', 'Notas crédito (se descuentan)', ncs]] : []).map(function (r) {
         return '\x3cbutton class="row row-btn row-2' + (S.gF === r[0] ? ' on' : '') + '" data-gf="' + r[0] + '">\x3cspan>' + r[1] + ' ›\x3csmall>' + (r[0] === 'nc' ? r[2].length + (r[2].length === 1 ? ' nota crédito' : ' notas crédito') : nD(r[2].length).replace('pago', 'factura')) + (r[0] === 'venc' && r[2].length ? ' · la más vieja ' + Math.max.apply(null, r[2].map(function (i) { return i.d; })) + ' días' : '') + '\x3c/small>\x3c/span>' + amt(suma(r[2])) + '\x3c/button>';
@@ -1800,7 +1804,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     h += (bq || '\x3cdiv class="empty">No hay facturas con estos filtros.\x3c/div>') + '\x3c/section>';
     h += '\x3csection class="sec">\x3cdiv class="pick">\x3clabel>Pago\x3c/label>\x3cinput type="date" id="a-pf" class="search" style="max-width:190px" value="' + (S.aFecha ? iso(S.aFecha) : '') + '" min="' + iso(L) + '" max="' + iso(L + 6) + '" aria-label="Fecha prevista de pago">\x3cspan class="meta">Fecha en que se pagará (opcional)\x3c/span>\x3c/div>\x3c/section>\x3cdiv class="ck-space">\x3c/div>';
     var tot = suma(sel) + (S.aSel && keepT ? keepT : 0);
-    h += '\x3cdiv class="ck-bar" role="status">\x3cdiv>\x3csmall>' + nD(sel.length + keep.length) + (rgSel ? ' · ' + rgSel.corto : '') + (sucio ? ' · sin guardar' : '') + '\x3c/small>\x3cb>' + M(tot) + '\x3c/b>\x3c/div>\x3cbutton class="btn pri" id="a-save"' + (!sel.length && !keep.length && !doc ? ' disabled' : '') + '>Guardar autorización\x3c/button>\x3c/div>';
+    h += '\x3cdiv class="ck-bar" role="status">\x3cdiv>\x3csmall>' + nD(sel.length + keep.length) + (rgSel ? ' · ' + rgSel.corto : '') + (sucio ? ' · sin guardar' : '') + '\x3c/small>\x3cb>' + M(tot) + '\x3c/b>\x3c/div>\x3cbutton class="btn pri" id="a-save"' + (!sel.length && !keep.length && !doc ? ' disabled' : '') + '>' + (doc ? 'Guardar cambios' : 'Guardar autorización') + '\x3c/button>\x3c/div>';
     return h;
   }
   /* ---------- PDF carta (generador propio, sin librerías) ---------- */
@@ -2223,7 +2227,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (admin && nOut) h += '\x3cdiv class="ck-bar no-print">\x3cdiv>\x3csmall>Se quitan ' + nOut + (nOut === 1 ? ' factura' : ' facturas') + ' (' + M(totOut) + ')\x3c/small>\x3cb>Nuevo total ' + M(totNew) + '\x3c/b>\x3c/div>\x3cspan>\x3cbutton class="btn" id="r-undo">Deshacer\x3c/button> \x3cbutton class="btn pri" id="r-proc">Procesar cambios\x3c/button>\x3c/span>\x3c/div>';
     if (pagadas) h += '\x3cp class="note no-print">' + pagadas + (pagadas === 1 ? ' pago autorizado ya no aparece' : ' pagos autorizados ya no aparecen') + ' como pendiente en el último Excel (' + M(pagadasT) + '): lo más probable es que ya se pagaron.\x3c/p>';
     h += '\x3cdiv class="rep-sign">\x3cdiv>Autorizó\x3c/div>\x3cdiv>Recibido contabilidad\x3c/div>\x3c/div>';
-    h += '\x3cdiv class="ck-share no-print">\x3cspan>\x3cbutton class="btn pri" data-apdf="1">Descargar PDF (tamaño carta)\x3c/button> \x3cbutton class="btn" data-aview="1">Ver PDF\x3c/button> \x3cbutton class="btn" data-ashare="1">Compartir como texto\x3c/button>\x3c/span>\x3cspan class="meta">El PDF trae una hoja por proveedor (con sus facturas y total) y al final el informe de todo lo que se paga.\x3c/span>\x3c/div>' + (admin ? '\x3cdiv class="ck-share no-print del-box">\x3cbutton class="btn dng" data-adel="1">Eliminar esta autorización\x3c/button>\x3cspan class="meta">Borra el informe guardado de esta semana y deja todo como antes de autorizar. No toca el Excel.\x3c/span>\x3c/div>' : '') + '\x3c/section>';
+    h += (admin ? '\x3cdiv class="ck-share no-print">\x3cspan>\x3cbutton class="btn pri" data-aedit="1">✏️ Editar y agregar pagos\x3c/button>\x3c/span>\x3cspan class="meta">Vuelve a mostrar todos los pagos pendientes para agregarle más a esta programación.\x3c/span>\x3c/div>' : '') + '\x3cdiv class="ck-share no-print">\x3cspan>\x3cbutton class="btn pri" data-apdf="1">Descargar PDF (tamaño carta)\x3c/button> \x3cbutton class="btn" data-aview="1">Ver PDF\x3c/button> \x3cbutton class="btn" data-ashare="1">Compartir como texto\x3c/button>\x3c/span>\x3cspan class="meta">El PDF trae una hoja por proveedor (con sus facturas y total) y al final el informe de todo lo que se paga.\x3c/span>\x3c/div>' + (admin ? '\x3cdiv class="ck-share no-print del-box">\x3cbutton class="btn dng" data-adel="1">Eliminar esta autorización\x3c/button>\x3cspan class="meta">Borra el informe guardado de esta semana y deja todo como antes de autorizar. No toca el Excel.\x3c/span>\x3c/div>' : '') + '\x3c/section>';
     return h;
   }
   /* ---------- PROGRAMACIÓN DE PAGOS (por fecha de programación, lunes a domingo) ---------- */
@@ -2647,6 +2651,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var apv = document.getElementById('a-prev'); if (apv) apv.onclick = function () { S.aWeek -= 7; S.aInit = null; S.cProg = 0; render(); };
     var anx = document.getElementById('a-next'); if (anx) anx.onclick = function () { S.aWeek += 7; S.aInit = null; S.cProg = 0; render(); };
     var asv = document.getElementById('a-save'); if (asv) asv.onclick = autGuardar;
+    var aed = root.querySelector('[data-aedit]'); if (aed) aed.onclick = function () { S.aView = 'sel'; window.scrollTo(0, 0); render(); };
     var adl = root.querySelector('[data-adel]'); if (adl) adl.onclick = autEliminar;
     root.querySelectorAll('[data-pp]').forEach(function (b) { b.onclick = function () { var wid = iso(S.aWeek); S.aN[wid] = +b.dataset.pp; ppSync(wid); S.aInit = null; S.aSel = {}; S.rOut = {}; S.err = null; S.aView = S.aN[wid] ? 'rep' : 'sel'; render(); }; });
     root.querySelectorAll('[data-cpp]').forEach(function (b) { b.onclick = function () { S.cProg = +b.dataset.cpp; render(); }; });

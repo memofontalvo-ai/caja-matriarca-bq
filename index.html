@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 7.4
+  Flujo de Caja La Matriarca — versión 7.5
 
   HISTORIAL DE VERSIONES
+  v7.5 (9 oct 2026) — Resumen: «Disponible para distribuir» usa lo programado.
+    · Ya no resta todo lo que se debe, sino solo los pagos programados por usted que siguen
+      pendientes (más tarjetas/reserva de impuestos del Excel, si las hay) y la reserva operativa.
+    · Al guardar una programación, el valor se recalcula solo.
   v7.4 (9 oct 2026) — Resumen: «Todo lo que se debe» aclarado.
     · Muestra todo lo pendiente en cuentas por pagar por rubro (proveedores, servicios, personal,
       gastos, obligaciones) y su total.
@@ -366,7 +370,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="7.4">
+<meta name="version" content="7.5">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -383,7 +387,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "7.4";
+window.MX_VERSION = "7.5";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1200,15 +1204,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         extra: '\x3cdiv class="card-x">' + row('Flujo neto del mes', d.mes.neto) + '\x3c/div>' }) +
       '\x3c/section>';
     // Indicadores
-    var semTxt = { rojo: 'Los compromisos superan lo disponible', amarillo: 'No hay excedente para repartir', verde: 'Hay excedente para repartir' }[R.sem];
+    /* v7.5 Disponible para distribuir: bancos + MEGAMAS − pagos programados pendientes − reservas (no todo lo que se debe) */
+    var otrosC = (W.hojaObl ? 0 : W.tarjetas) + W.reservaImp, compP = tPa + otrosC;
+    var consP = Math.max(0, R.inmediato - compP - R.flujo.reserva), maxP = Math.max(0, Math.min(consP, R.flujo.minSobre)), semP = R.inmediato < compP ? 'rojo' : (maxP <= 0 ? 'amarillo' : 'verde');
+    var semTxt = { rojo: 'Los compromisos superan lo disponible', amarillo: 'No hay excedente para repartir', verde: 'Hay excedente para repartir' }[semP];
     h += '\x3csection class="cards2">' +
       card({ icon: 'deuda', title: 'Todo lo que se debe', sub: 'Incluye lo que aún no tiene fecha', go: 'pagar',
         body: grp('Todo lo que se debe, por rubro') + row('Proveedores', R.pend.all.prov) + row('Servicios (arriendo, servicios públicos)', R.pend.all.serv) + row('Personal', R.pend.all.pers) + row('Gastos varios', R.pend.all.gast) + (W.hojaObl ? row('Obligaciones financieras', R.pend.all.obl) : '') + (W.hojaObl ? (W.reservaImp ? row('Reserva de impuestos', W.reservaImp) : '') : (W.tarjetas + W.reservaImp ? row('Tarjetas y otras reservas', W.tarjetas + W.reservaImp) : '')),
         totalLbl: 'Total deudas', total: R.compromisos,
         extra: '\x3cdiv class="card-x">' + grp('De lo que se debe en cuentas por pagar (' + M(R.pend.tAll) + ')') + row('Ya programado por usted y pendiente de pago', tPa, 'sub') + row('Aún sin programar', Math.max(0, R.pend.tAll - tPa), 'sub') + '\x3cp class="note">' + (S.aAll[wid] === undefined ? 'Leyendo sus programaciones…' : nAut ? 'Programado = lo guardado en las ' + nAut + (nAut === 1 ? ' programación' : ' programaciones') + ' de la semana ' + F(Lw) + ' – ' + F(Lw + 6) + ' que todavía no figura pagado.' : 'Todavía no hay programación guardada esta semana.') + '\x3c/p>\x3c/div>' }) +
-      card({ icon: 'dist', title: 'Disponible para distribuir', sub: chip(R.sem, semTxt), go: 'flujo',
-        body: row('Bancos, cajas y MEGAMAS', R.inmediato) + row('Todo lo que se debe', -R.compromisos) + row('Reserva operativa (7 días)', -R.flujo.reserva),
-        totalLbl: 'Se puede distribuir', total: R.maxDist, tone: R.maxDist > 0 ? 'good' : '' }) +
+      card({ icon: 'dist', title: 'Disponible para distribuir', sub: chip(semP, semTxt), go: 'flujo',
+        body: row('Bancos, cajas y MEGAMAS', R.inmediato) + row('Pagos programados pendientes', -tPa) + (otrosC > 0.5 ? row('Tarjetas y reserva de impuestos', -otrosC) : '') + row('Reserva operativa (7 días)', -R.flujo.reserva),
+        totalLbl: 'Se puede distribuir', total: maxP, tone: maxP > 0 ? 'good' : '' }) +
       '\x3c/section>';
     // Alertas
     h += '\x3csection class="sec">\x3cdiv class="sec-head">\x3ch2>Alertas\x3c/h2>\x3cspan class="meta">Se revisan solas con cada Excel\x3c/span>\x3c/div>';

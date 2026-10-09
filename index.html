@@ -1,8 +1,13 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 7.1
+  Flujo de Caja La Matriarca — versión 7.2
 
   HISTORIAL DE VERSIONES
+  v7.2 (9 oct 2026) — Resumen: «Pagos programados sin pagar» corregido.
+    · Ahora muestra solo lo que usted programó (programaciones guardadas de la semana) y
+      sigue pendiente de pago, por rubro. Ya no suma lo vencido del Excel.
+    · «Ver detalle» abre Pagos autorizados.
+    · El «Disponible real» del Resumen descuenta esa misma cifra (pagos programados pendientes).
   v7.1 (8 oct 2026) — Informe en imagen (JPG) rediseñado para varias programaciones.
     · Mismo tamaño de pantalla de teléfono. Muestra el % pagado total y, por separado,
       el % de cada programación (con su código, fecha, programado, pagado y falta).
@@ -351,7 +356,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="7.1">
+<meta name="version" content="7.2">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -368,7 +373,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "7.1";
+window.MX_VERSION = "7.2";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1125,8 +1130,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 
   function vResumen(R, A) {
     var p = R.pend.prog, c = R.cxc, D = S.D;
+    /* v7.2 «Pagos programados sin pagar» = lo que el administrador programó (guardado) y sigue pendiente, no lo vencido del Excel */
+    var Lw = MX.lunesDe(authD()), wid = iso(Lw); aLoad(Lw);
+    var pa = { prov: 0, pers: 0, serv: 0, gast: 0, obl: 0 }, nAut = (S.aAll[wid] || []).length, tpa = ppTodas(wid);
+    if (tpa) compItems(tpa).forEach(function (i) { if (pa[i.it.cat] != null) pa[i.it.cat] += i.pend; });
+    var tPa = pa.prov + pa.pers + pa.serv + pa.gast + pa.obl, dispA = R.inmediato - tPa - R.imp;
     var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Resumen al ' + F(D, true) + '\x3c/h2>\x3cspan class="meta">Excel del ' + F(W.fechaInforme, true) + ' · cargado ' + fmtStamp(W.cargado) + '\x3c/span>\x3c/div>' +
-      chip(R.disp < 0 ? 'rojo' : 'verde', R.disp < 0 ? 'Disponible negativo' : 'Disponible positivo') + '\x3c/div>';
+      chip(dispA < 0 ? 'rojo' : 'verde', dispA < 0 ? 'Disponible negativo' : 'Disponible positivo') + '\x3c/div>';
     // Bancos
     var bancos = '';
     var row0 = R.real.row;
@@ -1146,16 +1156,16 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     col1 += card({ icon: 'sum', title: 'Saldo total real del día', sub: 'Todo lo que se tiene hoy', cls: 'big',
       body: row('Bancos y cajas', R.real.total) + row('MEGAMAS', R.mega.saldo),
       totalLbl: 'Total real del día', total: R.inmediato, tone: 'good' });
-    var col2 = card({ icon: 'pagos', title: 'Pagos programados sin pagar', sub: 'Programados hasta el ' + F(D), go: 'pagar',
-      body: row('Proveedores', -p.prov) + row('Personal', -p.pers) + row('Servicios (arriendo, servicios públicos)', -p.serv) + row('Gastos varios', -p.gast) + (W.hojaObl ? row('Obligaciones financieras', -p.obl) : ''),
-      totalLbl: 'Total por pagar', total: -R.pend.tProg, tone: 'neg' });
+    var col2 = card({ icon: 'pagos', title: 'Pagos programados sin pagar', sub: S.aAll[wid] === undefined ? 'Leyendo sus programaciones…' : nAut ? 'Lo que usted programó y sigue pendiente · ' + nAut + (nAut === 1 ? ' programación' : ' programaciones') + ' de la semana' : 'Todavía no hay programación guardada esta semana', go: 'auth',
+      body: row('Proveedores', -pa.prov) + row('Personal', -pa.pers) + row('Servicios (arriendo, servicios públicos)', -pa.serv) + row('Gastos varios', -pa.gast) + (W.hojaObl ? row('Obligaciones financieras', -pa.obl) : ''),
+      totalLbl: 'Total por pagar', total: -tPa, tone: 'neg' });
     col2 += card({ icon: 'imp', title: 'Impuestos', sub: R.imp ? 'Provisionados en el Excel' : 'Sin valores en el Excel',
       body: Object.keys(W.impuestos).map(function (k) { return row(k, -W.impuestos[k]); }).join(''),
       totalLbl: 'Total impuestos', total: -R.imp, tone: 'neg' });
     col2 += card({ icon: 'res', title: 'Disponible real', sub: 'Saldo total real − pagos − impuestos', cls: 'big',
-      body: row('Saldo total real del día', R.inmediato) + row('Pagos programados', -R.pend.tProg) + row('Impuestos', -R.imp),
-      totalLbl: 'Disponible real', total: R.disp, tone: R.disp < 0 ? 'bad' : 'good',
-      extra: '\x3cdiv class="card-x">' + row('Si se cobran las cuentas por cobrar', R.dispConCxc) + '\x3cp class="note">' + (W.excel && W.excel.megaEnDisponible ? (S.D === W.fechaInforme ? (Math.abs(R.disp - W.excel.disponible) < 2 ? 'El disponible real coincide con el del Excel (' + M(W.excel.disponible) + ').' : 'Ojo: el Excel muestra ' + M(W.excel.disponible) + ' como disponible real.') : 'El Excel calcula el disponible real con esta misma fórmula.') : 'Esta cifra es la que el Excel llama “Disponible real”.') + '\x3c/p>\x3c/div>' });
+      body: row('Saldo total real del día', R.inmediato) + row('Pagos programados', -tPa) + row('Impuestos', -R.imp),
+      totalLbl: 'Disponible real', total: dispA, tone: dispA < 0 ? 'bad' : 'good',
+      extra: '\x3cdiv class="card-x">' + row('Si se cobran las cuentas por cobrar', R.dispConCxc + R.pend.tProg - tPa) + '\x3cp class="note">' + 'Solo se descuentan los pagos que usted programó y siguen pendientes. Lo vencido que no programó no se resta aquí.' + '\x3c/p>\x3c/div>' });
     h += '\x3csection class="cards2">\x3cdiv class="col">' + col1 + '\x3c/div>\x3cdiv class="col">' + col2 + '\x3c/div>\x3c/section>';
     // Segunda fila
     var d = MX.dia(W, D), m0 = d.m0;

@@ -1,8 +1,13 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 8.0
+  Flujo de Caja La Matriarca — versión 8.1
 
   HISTORIAL DE VERSIONES
+  v8.1 (9 oct 2026) — Full cost: compras a crédito, de contado, notas crédito y efectivo.
+    · El full cost suma todas las compras de proveedores (crédito y contado), resta las notas
+      crédito y suma las compras de insumos pagadas en efectivo por caja.
+    · Nuevo bloque «Qué incluye el full cost» con cada parte y su valor, y un botón para
+      incluir o quitar las compras en efectivo.
   v8.0 (9 oct 2026) — Full cost unificado y comparativo mes a mes.
     · Las compras de Calle 80 y Mall Plaza se suman en un solo full cost (como viene en el Excel).
     · La venta se muestra por punto (Calle 80 y Mall Plaza), se le quita impoconsumo y propina,
@@ -394,7 +399,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="8.0">
+<meta name="version" content="8.1">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -411,7 +416,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "8.0";
+window.MX_VERSION = "8.1";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -2636,6 +2641,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var ga = root.querySelector('[data-gall]'); if (ga) ga.onclick = function () { root.querySelectorAll('[data-ak]').forEach(function (c) { S.aSel[c.dataset.ak] = 1; }); render(); };
     var gn = root.querySelector('[data-gnone]'); if (gn) gn.onclick = function () { if (confirm('¿Quitar todas las marcas de la lista?')) { S.aSel = {}; render(); } };
     var apf = document.getElementById('a-pf'); if (apf) apf.onchange = function () { S.aFecha = apf.value ? fromIso(apf.value) : null; render(); };
+    root.querySelectorAll('[data-fccash]').forEach(function (b) { b.onclick = function () { S.fcCash = S.fcCash === false; render(); }; });
     var fcp = document.getElementById('fc-prev'); if (fcp) fcp.onclick = function () { S.fcW -= 7; render(); };
     var fcn = document.getElementById('fc-next'); if (fcn) fcn.onclick = function () { S.fcW += 7; render(); };
     var apv = document.getElementById('a-prev'); if (apv) apv.onclick = function () { S.aWeek -= 7; S.aInit = null; S.cProg = 0; render(); };
@@ -2902,16 +2908,29 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   }
   /* ---------- v8.0 FULL COST del restaurante: compras unificadas (Calle 80 + Mall Plaza) / venta neta ---------- */
   function fcPct(a, b) { return b > 0.5 ? (Math.round(a / b * 1000) / 10).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%' : '—'; }
+  /* compras de insumos pagadas en efectivo desde caja: salen como gasto (Mercadeo/Aseo…) pagado con Caja General o Caja Mall Plaza */
+  function fcCajaInsumo(p) {
+    if (p.cat !== 'gast' || !/caja/i.test(p.banco || '') || !p.valor) return false;
+    var tx = ((p.concepto || '') + ' ' + (p.sub || '')).toLowerCase(), te = (p.tercero || '').toLowerCase();
+    if (/flor|vela|decor|regalo|papeler|dotaci|zapato|transporte|mantenim|donaci|orquesta|turno/.test(tx)) return false;
+    return p.sub === 'Aseo' || /insumo|abarrot|arroz|azucar|azúcar|yuca|brownie|hierba|fruta|verdura|carne|pollo|pescado|hielo|licor|bebida|leche|huevo|queso|harina|aceite|mercado|cerveza|gaseosa|pan\b|aseo|desechable/.test(tx) || (/olimpica|olímpica|\bd1\b|tiendas d1|exito|éxito|jumbo|makro|\bara\b/.test(te) && p.sub === 'Mercadeo');
+  }
   function fcRange(d1, d2) {
     var d1o = d1; if (W.inicio && d1 < W.inicio) d1 = W.inicio; /* el Excel empieza el control en W.inicio: ventas y compras se comparan desde ahí */
     var V = MX.ventas(W, d1, d2), o = { d1: d1o, d2: d2, c80: { v: 0, ico: 0, prop: 0, neta: 0 }, mp: { v: 0, ico: 0, prop: 0, neta: 0 }, tot: { v: 0, ico: 0, prop: 0, neta: 0 }, comp: 0, subs: {}, nf: 0, nDias: V.dias.filter(function (d) { return d.total; }).length };
     V.dias.forEach(function (d) { o.c80.v += d.c80; o.c80.ico += d.icoC80; o.c80.prop += d.propC80; o.mp.v += d.mp; o.mp.ico += d.icoMP; o.mp.prop += d.propMP; });
     ['c80', 'mp'].forEach(function (k) { o[k].neta = o[k].v - o[k].ico - o[k].prop; o.tot.v += o[k].v; o.tot.ico += o[k].ico; o.tot.prop += o[k].prop; o.tot.neta += o[k].neta; });
-    MX.facturas(W).forEach(function (x) {
-      if (x.cat !== 'prov' || x.fDoc == null || x.fDoc < d1 || x.fDoc > d2) return;
-      var sub = x.sub || 'Sin clasificar', s = o.subs[sub] || (o.subs[sub] = { name: sub, tot: 0, prov: {} });
-      s.tot += x.valor; o.comp += x.valor; o.nf++;
-      var tk = x.tercero || '(sin nombre)'; s.prov[tk] = (s.prov[tk] || 0) + x.valor;
+    o.det = { cred: { v: 0, n: 0 }, cont: { v: 0, n: 0 }, nc: { v: 0, n: 0 }, caja: { v: 0, n: 0 } };
+    function aSub(sub, key, val) { var s = o.subs[sub] || (o.subs[sub] = { name: sub, tot: 0, prov: {} }); s.tot += val; s.prov[key] = (s.prov[key] || 0) + val; o.comp += val; }
+    W.pay.forEach(function (p) {
+      if (p.cat === 'prov' && p.fDoc != null && p.fDoc >= d1 && p.fDoc <= d2 && p.valor) {
+        var t = p.valor < 0 ? o.det.nc : (p.tipo === 'Contado' ? o.det.cont : o.det.cred); t.v += p.valor; t.n++; if (p.valor > 0) o.nf++;
+        aSub(p.sub || 'Sin clasificar', p.tercero || '(sin nombre)', p.valor);
+      } else if (S.fcCash !== false && fcCajaInsumo(p)) {
+        var f = p.fDoc || p.fPago || p.fProg; if (f == null || f < d1 || f > d2) return;
+        o.det.caja.v += p.valor; o.det.caja.n++; o.nf++;
+        aSub('Compras en efectivo (caja)', (p.tercero || '(sin nombre)') + ' · ' + (p.concepto || ''), p.valor);
+      }
     });
     return o;
   }
@@ -2928,12 +2947,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   function vFcost() {
     if (S.fcW == null) S.fcW = MX.lunesDe(W.fechaInforme || authD());
     var L = S.fcW, m = fcRange(L, L + 6), neta = m.tot.neta, h = '';
-    h += '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Full cost del restaurante\x3c/h2>\x3cspan class="meta">Compras de proveedores (Calle 80 + Mall Plaza unificadas) frente a la venta neta, sin impoconsumo ni propina\x3c/span>\x3c/div>\x3c/div>';
+    h += '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Full cost del restaurante\x3c/h2>\x3cspan class="meta">Todas las compras (crédito, contado, notas crédito y efectivo; Calle 80 + Mall Plaza) frente a la venta neta, sin impoconsumo ni propina\x3c/span>\x3c/div>\x3c/div>';
     h += '\x3cdiv class="weeknav">\x3cbutton class="btn" id="fc-prev" aria-label="Semana anterior">‹ Anterior\x3c/button>\x3cdiv class="weeknav-t">\x3csmall>' + (L === MX.lunesDe(W.fechaInforme || L) ? 'Última semana con datos' : 'Semana') + '\x3c/small>\x3cb>Lun ' + F(L) + ' – dom ' + F(L + 6) + '\x3c/b>\x3c/div>\x3cbutton class="btn" id="fc-next" aria-label="Semana siguiente">Siguiente ›\x3c/button>\x3c/div>';
     if (W.fechaInforme && L + 6 > W.fechaInforme) h += '\x3cdiv class="banner warn">\x3cspan>Semana incompleta: el Excel llega hasta el ' + F(W.fechaInforme, true) + ' (' + m.nDias + (m.nDias === 1 ? ' día' : ' días') + ' con venta). El porcentaje puede cambiar al completarse.\x3c/span>\x3c/div>';
     if (!m.tot.v && !m.comp) h += '\x3cdiv class="panel empty">No hay ventas ni compras registradas en el Excel para esta semana.\x3c/div>';
     else {
       h += '\x3cdiv class="panel cp-sum">\x3cdiv class="cp-cols">\x3cdiv>\x3csmall>Venta neta\x3c/small>\x3cb>' + M(neta) + '\x3c/b>\x3cspan class="meta">sin ICO ni propina\x3c/span>\x3c/div>\x3cdiv class="fa">\x3csmall>Full cost\x3c/small>\x3cb>' + M(m.comp) + '\x3c/b>\x3cspan class="meta">' + m.nf + ' facturas\x3c/span>\x3c/div>\x3cdiv class="ok">\x3csmall>% sobre venta\x3c/small>\x3cb>' + fcPct(m.comp, neta) + '\x3c/b>\x3cspan class="meta">toda la operación\x3c/span>\x3c/div>\x3c/div>\x3c/div>';
+      var dt = m.det;
+      h += '\x3csection class="card" style="padding:12px 14px;margin-top:10px">\x3cdiv class="card-t">\x3ch3>Qué incluye el full cost\x3c/h3>\x3c/div>\x3cdl class="cp-kv">' +
+        '\x3cdiv>\x3cdt>Facturas a crédito (' + dt.cred.n + ')\x3c/dt>\x3cdd>' + M(dt.cred.v) + '\x3c/dd>\x3c/div>\x3cdiv>\x3cdt>Compras de contado: banco o tarjeta (' + dt.cont.n + ')\x3c/dt>\x3cdd>' + M(dt.cont.v) + '\x3c/dd>\x3c/div>\x3cdiv>\x3cdt>Notas crédito de proveedores (' + dt.nc.n + ')\x3c/dt>\x3cdd>' + M(dt.nc.v) + '\x3c/dd>\x3c/div>' +
+        '\x3cdiv>\x3cdt>Compras en efectivo por caja (' + dt.caja.n + ')\x3c/dt>\x3cdd>' + M(dt.caja.v) + '\x3c/dd>\x3c/div>\x3cdiv class="fa">\x3cdt>\x3cb>Full cost\x3c/b>\x3c/dt>\x3cdd>\x3cb>' + M(m.comp) + '\x3c/b>\x3c/dd>\x3c/div>\x3c/dl>' +
+        '\x3cdiv class="cp-bt no-print">\x3cbutton type="button" class="btn" data-fccash="1">' + (S.fcCash !== false ? 'Quitar las compras en efectivo' : 'Incluir las compras en efectivo por caja') + '\x3c/button>\x3c/div>' +
+        '\x3cp class="note" style="margin:6px 0 0">Las compras en efectivo se toman de los gastos pagados con Caja General o Caja Mall Plaza que son insumos (abarrotes, bebidas, fruver, aseo, compras en Olímpica o D1…). Si alguna no corresponde, avíseme y ajusto la regla.\x3c/p>\x3c/section>';
       var vrows = [['Venta Calle 80', m.c80.v], ['Venta Mall Plaza', m.mp.v]], pr = m.tot.prop;
       h += '\x3csection class="card" style="padding:12px 14px;margin-top:10px">\x3cdiv class="card-t">\x3ch3>De la venta al full cost\x3c/h3>\x3c/div>\x3cdl class="cp-kv">' +
         vrows.map(function (r) { return '\x3cdiv>\x3cdt>' + r[0] + '\x3c/dt>\x3cdd>' + M(r[1]) + '\x3c/dd>\x3c/div>'; }).join('') +
@@ -2961,7 +2986,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         '\x3cdiv class="cprow">\x3cspan class="ck-b">\x3cb>Venta Calle 80\x3c/b>\x3c/span>\x3cspan class="cp-a">\x3cb>' + M(r.c80.v) + '\x3c/b>\x3c/span>\x3c/div>\x3cdiv class="cprow">\x3cspan class="ck-b">\x3cb>Venta Mall Plaza\x3c/b>\x3c/span>\x3cspan class="cp-a">\x3cb>' + M(r.mp.v) + '\x3c/b>\x3c/span>\x3c/div>\x3cdiv class="cprow">\x3cspan class="ck-b">\x3cb>– Impoconsumo' + (r.tot.prop ? ' y propina' : '') + '\x3c/b>\x3c/span>\x3cspan class="cp-a">\x3cb>' + M(-(r.tot.ico + r.tot.prop)) + '\x3c/b>\x3c/span>\x3c/div>' +
         fcSubsHtml(r, 'cp|fcm|' + r.name + '|') + '\x3c/details>';
     }).join('');
-    h += '\x3cp class="note">Cómo se calcula: \x3cb>Full cost\x3c/b> = todas las facturas de proveedores con fecha de factura dentro del periodo (Calle 80 y Mall Plaza juntas; incluye IVA y notas crédito). \x3cb>Venta neta\x3c/b> = venta de los cierres de ambos puntos menos impoconsumo' + (m.tot.prop ? ' y propina' : '') + '. ' + (m.tot.prop ? '' : 'La propina no viene en el Excel, por eso no se resta. ') + 'Los meses «parcial» no tienen todos sus días en el Excel y no entran en «el mejor mes» ni «el más alto».\x3c/p>';
+    h += '\x3cp class="note">Cómo se calcula: \x3cb>Full cost\x3c/b> = todas las compras de proveedores con fecha de factura dentro del periodo, a crédito y de contado, menos las notas crédito, más las compras de insumos pagadas en efectivo por caja (Calle 80 y Mall Plaza juntas; incluye IVA). \x3cb>Venta neta\x3c/b> = venta de los cierres de ambos puntos menos impoconsumo' + (m.tot.prop ? ' y propina' : '') + '. ' + (m.tot.prop ? '' : 'La propina no viene en el Excel, por eso no se resta. ') + 'Los meses «parcial» no tienen todos sus días en el Excel y no entran en «el mejor mes» ni «el más alto».\x3c/p>';
     return h;
   }
   function vComp() {

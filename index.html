@@ -1,8 +1,13 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 7.3
+  Flujo de Caja La Matriarca — versión 7.4
 
   HISTORIAL DE VERSIONES
+  v7.4 (9 oct 2026) — Resumen: «Todo lo que se debe» aclarado.
+    · Muestra todo lo pendiente en cuentas por pagar por rubro (proveedores, servicios, personal,
+      gastos, obligaciones) y su total.
+    · Abajo separa: cuánto de eso ya está programado por usted y sigue pendiente, y cuánto
+      está aún sin programar.
   v7.3 (9 oct 2026) — Disponible real en efectivo: solo se descuenta lo autorizado que sigue por pagar.
     · Los pagos autorizados que ya figuran pagados en el Excel ya salieron del banco, así que
       ya no se vuelven a restar. «(–) Pagos autorizados por pagar» muestra lo pendiente por
@@ -361,7 +366,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="7.3">
+<meta name="version" content="7.4">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -378,7 +383,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "7.3";
+window.MX_VERSION = "7.4";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1198,8 +1203,9 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var semTxt = { rojo: 'Los compromisos superan lo disponible', amarillo: 'No hay excedente para repartir', verde: 'Hay excedente para repartir' }[R.sem];
     h += '\x3csection class="cards2">' +
       card({ icon: 'deuda', title: 'Todo lo que se debe', sub: 'Incluye lo que aún no tiene fecha', go: 'pagar',
-        body: row('Programado hasta hoy', R.pend.tProg) + row('Programado más adelante', R.pend.tFut) + row('Sin fecha de programación', R.pend.tSin) + (W.hojaObl ? (W.reservaImp ? row('Reserva de impuestos', W.reservaImp) : '') : (W.tarjetas + W.reservaImp ? row('Tarjetas y otras reservas', W.tarjetas + W.reservaImp) : '')),
-        totalLbl: 'Total deudas', total: R.compromisos }) +
+        body: grp('Todo lo que se debe, por rubro') + row('Proveedores', R.pend.all.prov) + row('Servicios (arriendo, servicios públicos)', R.pend.all.serv) + row('Personal', R.pend.all.pers) + row('Gastos varios', R.pend.all.gast) + (W.hojaObl ? row('Obligaciones financieras', R.pend.all.obl) : '') + (W.hojaObl ? (W.reservaImp ? row('Reserva de impuestos', W.reservaImp) : '') : (W.tarjetas + W.reservaImp ? row('Tarjetas y otras reservas', W.tarjetas + W.reservaImp) : '')),
+        totalLbl: 'Total deudas', total: R.compromisos,
+        extra: '\x3cdiv class="card-x">' + grp('De lo que se debe en cuentas por pagar (' + M(R.pend.tAll) + ')') + row('Ya programado por usted y pendiente de pago', tPa, 'sub') + row('Aún sin programar', Math.max(0, R.pend.tAll - tPa), 'sub') + '\x3cp class="note">' + (S.aAll[wid] === undefined ? 'Leyendo sus programaciones…' : nAut ? 'Programado = lo guardado en las ' + nAut + (nAut === 1 ? ' programación' : ' programaciones') + ' de la semana ' + F(Lw) + ' – ' + F(Lw + 6) + ' que todavía no figura pagado.' : 'Todavía no hay programación guardada esta semana.') + '\x3c/p>\x3c/div>' }) +
       card({ icon: 'dist', title: 'Disponible para distribuir', sub: chip(R.sem, semTxt), go: 'flujo',
         body: row('Bancos, cajas y MEGAMAS', R.inmediato) + row('Todo lo que se debe', -R.compromisos) + row('Reserva operativa (7 días)', -R.flujo.reserva),
         totalLbl: 'Se puede distribuir', total: R.maxDist, tone: R.maxDist > 0 ? 'good' : '' }) +

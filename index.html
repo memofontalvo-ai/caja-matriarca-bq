@@ -1,8 +1,15 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 7.5
+  Flujo de Caja La Matriarca — versión 7.7
 
   HISTORIAL DE VERSIONES
+  v7.7 (9 oct 2026) — Lo programado y no pagado se arrastra de una semana a otra.
+    · «Pagos programados sin pagar», «Disponible real», «Disponible para distribuir» y
+      «Todo lo que se debe» cuentan lo programado y pendiente de la semana y de las 4 semanas
+      anteriores (sin repetir facturas), no solo la semana abierta.
+  v7.6 (9 oct 2026) — Resumen: «Disponible para distribuir» sin reserva operativa.
+    · Se quita la reserva operativa. Ahora resta los pagos programados pendientes y las
+      cuentas por pagar ya vencidas que todavía no están en ninguna programación.
   v7.5 (9 oct 2026) — Resumen: «Disponible para distribuir» usa lo programado.
     · Ya no resta todo lo que se debe, sino solo los pagos programados por usted que siguen
       pendientes (más tarjetas/reserva de impuestos del Excel, si las hay) y la reserva operativa.
@@ -370,7 +377,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="7.5">
+<meta name="version" content="7.7">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -387,7 +394,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "7.5";
+window.MX_VERSION = "7.7";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1146,7 +1153,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var p = R.pend.prog, c = R.cxc, D = S.D;
     /* v7.2 «Pagos programados sin pagar» = lo que el administrador programó (guardado) y sigue pendiente, no lo vencido del Excel */
     var Lw = MX.lunesDe(authD()), wid = iso(Lw); aLoad(Lw);
-    var pa = { prov: 0, pers: 0, serv: 0, gast: 0, obl: 0 }, nAut = (S.aAll[wid] || []).length, tpa = ppTodas(wid);
+    var pa = { prov: 0, pers: 0, serv: 0, gast: 0, obl: 0 }, acu = ppAcum(Lw), nAut = acu.np, tpa = acu.doc;
     if (tpa) compItems(tpa).forEach(function (i) { if (pa[i.it.cat] != null) pa[i.it.cat] += i.pend; });
     var tPa = pa.prov + pa.pers + pa.serv + pa.gast + pa.obl, dispA = R.inmediato - tPa - R.imp;
     var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Resumen al ' + F(D, true) + '\x3c/h2>\x3cspan class="meta">Excel del ' + F(W.fechaInforme, true) + ' · cargado ' + fmtStamp(W.cargado) + '\x3c/span>\x3c/div>' +
@@ -1170,7 +1177,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     col1 += card({ icon: 'sum', title: 'Saldo total real del día', sub: 'Todo lo que se tiene hoy', cls: 'big',
       body: row('Bancos y cajas', R.real.total) + row('MEGAMAS', R.mega.saldo),
       totalLbl: 'Total real del día', total: R.inmediato, tone: 'good' });
-    var col2 = card({ icon: 'pagos', title: 'Pagos programados sin pagar', sub: S.aAll[wid] === undefined ? 'Leyendo sus programaciones…' : nAut ? 'Lo que usted programó y sigue pendiente · ' + nAut + (nAut === 1 ? ' programación' : ' programaciones') + ' de la semana' : 'Todavía no hay programación guardada esta semana', go: 'auth',
+    var col2 = card({ icon: 'pagos', title: 'Pagos programados sin pagar', sub: acu.cargando && !nAut ? 'Leyendo sus programaciones…' : nAut ? 'Lo que usted programó y sigue pendiente · ' + nAut + (nAut === 1 ? ' programación' : ' programaciones') + ' (esta semana y anteriores)' : 'Todavía no hay programación guardada', go: 'auth',
       body: row('Proveedores', -pa.prov) + row('Personal', -pa.pers) + row('Servicios (arriendo, servicios públicos)', -pa.serv) + row('Gastos varios', -pa.gast) + (W.hojaObl ? row('Obligaciones financieras', -pa.obl) : ''),
       totalLbl: 'Total por pagar', total: -tPa, tone: 'neg' });
     col2 += card({ icon: 'imp', title: 'Impuestos', sub: R.imp ? 'Provisionados en el Excel' : 'Sin valores en el Excel',
@@ -1206,15 +1213,19 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     // Indicadores
     /* v7.5 Disponible para distribuir: bancos + MEGAMAS − pagos programados pendientes − reservas (no todo lo que se debe) */
     var otrosC = (W.hojaObl ? 0 : W.tarjetas) + W.reservaImp, compP = tPa + otrosC;
-    var consP = Math.max(0, R.inmediato - compP - R.flujo.reserva), maxP = Math.max(0, Math.min(consP, R.flujo.minSobre)), semP = R.inmediato < compP ? 'rojo' : (maxP <= 0 ? 'amarillo' : 'verde');
+    var enProg = {}; if (tpa) tpa.items.forEach(function (it) { enProg[it.k] = 1; });
+    var vencSP = pendArm().filter(function (x) { if (x.saldo <= 0.5 || enProg[aKey(x)]) return false; var v = venceDe(x, +S.gPlazo || 0); return v != null && v < authD(); });
+    var tVenc = vencSP.reduce(function (t, x) { return t + x.saldo; }, 0);
+    compP += tVenc;
+    var maxP = Math.max(0, R.inmediato - compP), semP = R.inmediato < compP ? 'rojo' : (maxP <= 0 ? 'amarillo' : 'verde');
     var semTxt = { rojo: 'Los compromisos superan lo disponible', amarillo: 'No hay excedente para repartir', verde: 'Hay excedente para repartir' }[semP];
     h += '\x3csection class="cards2">' +
       card({ icon: 'deuda', title: 'Todo lo que se debe', sub: 'Incluye lo que aún no tiene fecha', go: 'pagar',
         body: grp('Todo lo que se debe, por rubro') + row('Proveedores', R.pend.all.prov) + row('Servicios (arriendo, servicios públicos)', R.pend.all.serv) + row('Personal', R.pend.all.pers) + row('Gastos varios', R.pend.all.gast) + (W.hojaObl ? row('Obligaciones financieras', R.pend.all.obl) : '') + (W.hojaObl ? (W.reservaImp ? row('Reserva de impuestos', W.reservaImp) : '') : (W.tarjetas + W.reservaImp ? row('Tarjetas y otras reservas', W.tarjetas + W.reservaImp) : '')),
         totalLbl: 'Total deudas', total: R.compromisos,
-        extra: '\x3cdiv class="card-x">' + grp('De lo que se debe en cuentas por pagar (' + M(R.pend.tAll) + ')') + row('Ya programado por usted y pendiente de pago', tPa, 'sub') + row('Aún sin programar', Math.max(0, R.pend.tAll - tPa), 'sub') + '\x3cp class="note">' + (S.aAll[wid] === undefined ? 'Leyendo sus programaciones…' : nAut ? 'Programado = lo guardado en las ' + nAut + (nAut === 1 ? ' programación' : ' programaciones') + ' de la semana ' + F(Lw) + ' – ' + F(Lw + 6) + ' que todavía no figura pagado.' : 'Todavía no hay programación guardada esta semana.') + '\x3c/p>\x3c/div>' }) +
+        extra: '\x3cdiv class="card-x">' + grp('De lo que se debe en cuentas por pagar (' + M(R.pend.tAll) + ')') + row('Ya programado por usted y pendiente de pago', tPa, 'sub') + row('Aún sin programar', Math.max(0, R.pend.tAll - tPa), 'sub') + '\x3cp class="note">' + (acu.cargando && !nAut ? 'Leyendo sus programaciones…' : nAut ? 'Programado = lo guardado en ' + nAut + (nAut === 1 ? ' programación' : ' programaciones') + ' (semana ' + F(Lw) + ' – ' + F(Lw + 6) + ' y las 4 anteriores) que todavía no figura pagado.' : 'Todavía no hay programación guardada.') + '\x3c/p>\x3c/div>' }) +
       card({ icon: 'dist', title: 'Disponible para distribuir', sub: chip(semP, semTxt), go: 'flujo',
-        body: row('Bancos, cajas y MEGAMAS', R.inmediato) + row('Pagos programados pendientes', -tPa) + (otrosC > 0.5 ? row('Tarjetas y reserva de impuestos', -otrosC) : '') + row('Reserva operativa (7 días)', -R.flujo.reserva),
+        body: row('Bancos, cajas y MEGAMAS', R.inmediato) + row('Pagos programados pendientes', -tPa) + (otrosC > 0.5 ? row('Tarjetas y reserva de impuestos', -otrosC) : '') + row('Cuentas por pagar vencidas, sin programar (' + vencSP.length + ')', -tVenc),
         totalLbl: 'Se puede distribuir', total: maxP, tone: maxP > 0 ? 'good' : '' }) +
       '\x3c/section>';
     // Alertas
@@ -1538,6 +1549,15 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   }
   function ppVista(id) { var l = S.aAll[id]; if (!l || !l.length) return null; var n = S.cProg | 0; if (n) for (var i = 0; i < l.length; i++) if (l[i].pn === n) return l[i]; return ppTodas(id); }
   /* Pendientes menos lo ya incluido en las OTRAS programaciones de la semana */
+  /* v7.7 Lo programado y no pagado se arrastra: programaciones de la semana y de las 4 anteriores, sin repetir facturas */
+  function ppAcum(L) {
+    var docs = [], cargando = false, vistos = {}, items = [], k, Lk, idk;
+    for (k = 0; k <= 4; k++) { Lk = L - 7 * k; idk = iso(Lk); aLoad(Lk); if (S.aAll[idk] === undefined) { cargando = true; continue; } (S.aAll[idk] || []).slice().reverse().forEach(function (d) { docs.push(d); }); }
+    docs.forEach(function (d) { d.items.forEach(function (it) { if (!vistos[it.k]) { vistos[it.k] = 1; items.push(it); } }); });
+    if (!docs.length) return { doc: null, cargando: cargando, np: 0 };
+    var last = docs[0], v = { semana: iso(L), lunes: L, items: items, total: items.reduce(function (t, x) { return t + x.saldo; }, 0), n: items.length, por: last.por, guardadoISO: last.guardadoISO, fechaInforme: last.fechaInforme, codigo: 'Acumulado', virtual: true, np: docs.length };
+    return { doc: v, cargando: cargando, np: docs.length };
+  }
   function pendLib(wid) {
     var otr = {}, sel = S.aN[wid] | 0; (S.aAll[wid] || []).forEach(function (d) { if (d.pn !== sel) d.items.forEach(function (it) { otr[it.k] = 1; }); });
     return pendArm().filter(function (x) { return !otr[aKey(x)]; });
@@ -2007,7 +2027,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   function pdfBaja(blob, nombre) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); setTimeout(function () { document.body.removeChild(a); }, 500); }
   function vDisp(R) {
     var L = MX.lunesDe(authD()), id = iso(L); aLoad(L);
-    var doc = ppTodas(id), cargando = S.aAll[id] === undefined, im = W.impuestos || {};
+    var acd = ppAcum(L), doc = acd.doc, cargando = acd.cargando && !doc, im = W.impuestos || {};
     var caja = R.real.total, mega = R.mega.saldo, total = caja + mega;
     var g = { prov: [0, 0], pers: [0, 0], serv: [0, 0], gast: [0, 0], obl: [0, 0] };
     var nAutT = doc ? doc.n : 0;
@@ -2041,7 +2061,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     else if (!doc) h += '\x3cdiv class="dr-w">Sin autorización guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + ': no se descuenta ningún pago.\x3c/div>';
     h += '\x3cdiv class="dr-c">' + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') + '\x3c/div>' +
       '\x3cdiv class="dr-c">' + band('(–) Pagos autorizados por pagar', aut, 'no') +
-      '\x3cdiv class="dr-l">Solo lo que usted \x3cb>autorizó\x3c/b> esta semana (' + F(L) + ' – ' + F(L + 6) + ') y \x3cb>todavía no figura pagado\x3c/b> en el Excel.\x3c/div>' +
+      '\x3cdiv class="dr-l">Solo lo que usted \x3cb>autorizó\x3c/b> (esta semana y las anteriores) y \x3cb>todavía no figura pagado\x3c/b> en el Excel.\x3c/div>' +
       row('Proveedores', g.prov[0], g.prov[1]) + row('Personal', g.pers[0], g.pers[1]) + row('Servicios (arriendos y serv. públicos)', g.serv[0], g.serv[1]) + row('Gastos varios', g.gast[0], g.gast[1]) + (g.obl[1] || W.hojaObl ? row('Obligaciones financieras', g.obl[0], g.obl[1]) : '') + '\x3c/div>' +
       '\x3cdiv class="dr-c">' + band('(–) Impuestos', imp, 'no') + (ik.length ? mini(ik.map(function (k) { return [k, im[k]]; })) : mini([['ICO', 0], ['Retención', 0], ['ICA', 0], ['IVA', 0]])) + '\x3c/div>' +
       '\x3cdiv class="dr-hero' + (real < 0 ? ' neg' : '') + '">\x3csmall>Disponible real\x3c/small>\x3cb>' + M(real) + '\x3c/b>\x3c/div>' +
@@ -2089,7 +2109,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       card(30 + 30 + 34, function () { rowT(y, 30, 'Saldo en Caja y Bancos', null, M(m.caja)); sep(y + 30); rowT(y + 30, 30, 'Caja MEGAMAS', null, M(m.mega)); band(y + 60, 34, '#245a3a', 'Total disponible', M(m.total)); });
       y += 94 + 8;
       // pagos autorizados
-      c.font = 'italic 400 11.5px ' + FF; var leg = wrap(c, 'Solo lo autorizado esta semana (' + m.sem + ') que todavía no figura pagado en el Excel.', IW - 24), lh = leg.length * 15 + 8;
+      c.font = 'italic 400 11.5px ' + FF; var leg = wrap(c, 'Solo lo autorizado (esta semana y anteriores) que todavía no figura pagado en el Excel.', IW - 24), lh = leg.length * 15 + 8;
       card(34 + lh + 4 * 30, function () {
         band(y, 34, '#9c2027', '(–) Pagos autorizados por pagar', M(m.aut));
         c.fillStyle = '#fdecea'; c.fillRect(P, y + 34, IW, lh); leg.forEach(function (l, i) { c.font = 'italic 400 11.5px ' + FF; T(l, P + 12, y + 34 + 12 + i * 15, 11.5, 400, '#6d1015'); c.font = 'italic 400 11.5px ' + FF; });

@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 8.2
+  Flujo de Caja La Matriarca — versión 8.3
 
   HISTORIAL DE VERSIONES
+  v8.3 (9 oct 2026) — Full cost: acordeón de clasificaciones y semanas con fecha de inicio y cierre.
+    · «Compras por clasificación» es un acordeón con el total de las compras; al abrirlo salen
+      cada clasificación y sus proveedores.
+    · «Últimas 6 semanas» muestra cada semana de lunes a domingo (ej. 28 sep – 4 oct).
   v8.2 (9 oct 2026) — Pagos autorizados: botón para editar una programación guardada.
     · En el informe guardado hay un botón «Editar y agregar pagos»: vuelve a mostrar todos los
       pendientes, con los ya autorizados marcados, para agregar más y «Guardar cambios».
@@ -403,7 +407,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="8.2">
+<meta name="version" content="8.3">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -420,7 +424,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "8.2";
+window.MX_VERSION = "8.3";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -2969,12 +2973,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         vrows.map(function (r) { return '\x3cdiv>\x3cdt>' + r[0] + '\x3c/dt>\x3cdd>' + M(r[1]) + '\x3c/dd>\x3c/div>'; }).join('') +
         '\x3cdiv>\x3cdt>\x3cb>Venta total\x3c/b>\x3c/dt>\x3cdd>\x3cb>' + M(m.tot.v) + '\x3c/b>\x3c/dd>\x3c/div>\x3cdiv>\x3cdt>– Impoconsumo\x3c/dt>\x3cdd>' + M(-m.tot.ico) + '\x3c/dd>\x3c/div>' + (pr ? '\x3cdiv>\x3cdt>– Propina\x3c/dt>\x3cdd>' + M(-pr) + '\x3c/dd>\x3c/div>' : '') +
         '\x3cdiv>\x3cdt>\x3cb>Venta neta\x3c/b>\x3c/dt>\x3cdd>\x3cb>' + M(neta) + '\x3c/b>\x3c/dd>\x3c/div>\x3cdiv class="fa">\x3cdt>Compras de proveedores (todas)\x3c/dt>\x3cdd>' + M(m.comp) + '\x3c/dd>\x3c/div>\x3cdiv class="fa">\x3cdt>\x3cb>% full cost\x3c/b>\x3c/dt>\x3cdd>\x3cb>' + fcPct(m.comp, neta) + '\x3c/b>\x3c/dd>\x3c/div>\x3c/dl>\x3c/section>';
-      h += '\x3cdiv class="sec-head" style="margin-top:14px">\x3ch2>Compras por clasificación\x3c/h2>\x3cspan class="meta">Toque una para ver los proveedores\x3c/span>\x3c/div>' + fcSubsHtml(m, 'cp|fc|' + L + '|');
+      var kAc = 'cp|fcac|' + L;
+      h += '\x3cdetails class="party" style="margin-top:14px" data-k="' + kAc + '"' + (S.open[kAc] ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">Compras por clasificación\x3c/span>\x3cspan class="tot">' + M(m.comp) + '\x3c/span>\x3cspan class="sub">\x3cspan>' + fcPct(m.comp, neta) + ' de la venta neta · toque para abrir o cerrar\x3c/span>\x3c/span>\x3c/summary>' + fcSubsHtml(m, 'cp|fc|' + L + '|') + '\x3c/details>';
     }
     // últimas semanas
     var hist = []; for (var i = 5; i >= 0; i--) hist.push(fcRange(L - 7 * i, L - 7 * i + 6));
     h += '\x3cdiv class="sec-head" style="margin-top:14px">\x3ch2>Últimas 6 semanas\x3c/h2>\x3c/div>\x3cdiv class="panel">\x3cdiv class="dr-r sm" style="font-weight:700">\x3cspan>Semana\x3c/span>\x3cspan>Venta neta\x3c/span>\x3cspan>Compras\x3c/span>\x3cspan>%\x3c/span>\x3c/div>' +
-      hist.filter(function (w) { return w.tot.v || w.comp; }).map(function (w) { return '\x3cdiv class="dr-r sm">\x3cspan style="white-space:nowrap">' + F(w.d1) + '\x3c/span>\x3cspan>' + M(w.tot.neta) + '\x3c/span>\x3cspan>' + M(w.comp) + '\x3c/span>\x3cb>' + fcPct(w.comp, w.tot.neta) + '\x3c/b>\x3c/div>'; }).join('') + '\x3c/div>';
+      hist.map(function (w, ix) { w._l = L - 7 * (5 - ix); return w; }).filter(function (w) { return w.tot.v || w.comp; }).map(function (w) { return '\x3cdiv class="dr-r sm">\x3cspan style="white-space:nowrap">' + F(w._l) + ' – ' + F(w._l + 6) + '\x3c/span>\x3cspan>' + M(w.tot.neta) + '\x3c/span>\x3cspan>' + M(w.comp) + '\x3c/span>\x3cb>' + fcPct(w.comp, w.tot.neta) + '\x3c/b>\x3c/div>'; }).join('') + '\x3c/div>';
     // comparativo mes a mes
     var ref = W.fechaInforme || L, dd = MX.toJS(ref), y1 = dd.getUTCFullYear(), m1 = dd.getUTCMonth(), d0 = MX.toJS(W.inicio || (ref - 90)), ym = d0.getUTCFullYear() * 12 + d0.getUTCMonth(), meses = [];
     for (var k = Math.max(ym, y1 * 12 + m1 - 11); k <= y1 * 12 + m1; k++) {

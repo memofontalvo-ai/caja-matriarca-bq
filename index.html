@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 8.5
+  Flujo de Caja La Matriarca — versión 8.6
 
   HISTORIAL DE VERSIONES
+  v8.6 (15 oct 2026) — Full cost: tabla «Últimas 6 semanas» bien alineada.
+    · Columnas fijas y justificadas (números a la derecha), se ajusta al ancho de cualquier
+      teléfono o computador, semana en dos líneas (inicio / «al» fin) y fila de Total.
   v8.5 (14 oct 2026) — Toda la app abre con la fecha de hoy.
     · Al entrar, la fecha de corte es la de hoy (no la del Excel); se puede retroceder con las
       flechas o el calendario. Si el Excel es más viejo, el informe lo aclara.
@@ -417,7 +420,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="8.5">
+<meta name="version" content="8.6">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -434,7 +437,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "8.5";
+window.MX_VERSION = "8.6";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -941,6 +944,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .ppc b{font-size:14px}.ppc span{font-size:13px;color:#33423a}.ppc small{font-size:11.5px;color:#6b756e}
 .ppc.on{border-color:#173D30;background:#EAF3EC;box-shadow:0 0 0 2px #173D3022}
 .ppc.nueva{border-style:dashed;justify-content:center}
+
+/* v8.6 Full cost: tabla de últimas semanas alineada */
+.fcw{padding:6px 10px 8px}
+.fcw-r{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.3fr) minmax(0,1.3fr) minmax(0,.62fr);column-gap:6px;align-items:center;padding:9px 0;border-top:1px solid var(--line,#e3e5e1);font-variant-numeric:tabular-nums}
+.fcw-r:first-of-type{border-top:0}
+.fcw-r>span,.fcw-r>b{font-size:clamp(10px,2.9vw,13.5px);white-space:nowrap}
+.fcw-r>span:nth-child(2),.fcw-r>span:nth-child(3),.fcw-r>b{text-align:right}
+.fcw-s{display:flex;flex-direction:column;line-height:1.2;text-align:left}
+.fcw-s small{font-size:.8em;opacity:.7;font-weight:400}
+.fcw-h{font-weight:700;padding:6px 0 8px;border-bottom:2px solid var(--line,#e3e5e1)}
+.fcw-h>span{font-size:clamp(10.5px,3vw,12.5px)!important;opacity:.8;text-transform:none}
+.fcw-t{border-top:2px solid var(--line,#cfd3cd);font-weight:700;background:rgba(0,0,0,.025)}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -2993,8 +3008,11 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     }
     // últimas semanas
     var hist = []; for (var i = 5; i >= 0; i--) hist.push(fcRange(L - 7 * i, L - 7 * i + 6));
-    h += '\x3cdiv class="sec-head" style="margin-top:14px">\x3ch2>Últimas 6 semanas\x3c/h2>\x3c/div>\x3cdiv class="panel">\x3cdiv class="dr-r sm" style="font-weight:700">\x3cspan>Semana\x3c/span>\x3cspan>Venta neta\x3c/span>\x3cspan>Compras\x3c/span>\x3cspan>%\x3c/span>\x3c/div>' +
-      hist.map(function (w, ix) { w._l = L - 7 * (5 - ix); return w; }).filter(function (w) { return w.tot.v || w.comp; }).map(function (w) { return '\x3cdiv class="dr-r sm">\x3cspan style="white-space:nowrap">' + F(w._l) + ' – ' + F(w._l + 6) + '\x3c/span>\x3cspan>' + M(w.tot.neta) + '\x3c/span>\x3cspan>' + M(w.comp) + '\x3c/span>\x3cb>' + fcPct(w.comp, w.tot.neta) + '\x3c/b>\x3c/div>'; }).join('') + '\x3c/div>';
+    var hw = hist.map(function (w, ix) { w._l = L - 7 * (5 - ix); return w; }).filter(function (w) { return w.tot.v || w.comp; }), tn = 0, tc = 0;
+    hw.forEach(function (w) { tn += w.tot.neta; tc += w.comp; });
+    h += '\x3cdiv class="sec-head" style="margin-top:14px">\x3ch2>Últimas 6 semanas\x3c/h2>\x3cspan class="meta">Cada semana va de lunes a domingo\x3c/span>\x3c/div>\x3cdiv class="panel fcw">\x3cdiv class="fcw-r fcw-h">\x3cspan>Semana\x3c/span>\x3cspan>Venta neta\x3c/span>\x3cspan>Compras\x3c/span>\x3cspan>%\x3c/span>\x3c/div>' +
+      hw.map(function (w) { return '\x3cdiv class="fcw-r">\x3cspan class="fcw-s">\x3cb>' + F(w._l) + '\x3c/b>\x3csmall>al ' + F(w._l + 6) + '\x3c/small>\x3c/span>\x3cspan>' + M(w.tot.neta) + '\x3c/span>\x3cspan>' + M(w.comp) + '\x3c/span>\x3cb class="fcw-p">' + fcPct(w.comp, w.tot.neta) + '\x3c/b>\x3c/div>'; }).join('') +
+      (hw.length > 1 ? '\x3cdiv class="fcw-r fcw-t">\x3cspan class="fcw-s">\x3cb>Total\x3c/b>\x3csmall>' + hw.length + ' semanas\x3c/small>\x3c/span>\x3cspan>' + M(tn) + '\x3c/span>\x3cspan>' + M(tc) + '\x3c/span>\x3cb class="fcw-p">' + fcPct(tc, tn) + '\x3c/b>\x3c/div>' : '') + '\x3c/div>';
     // comparativo mes a mes
     var ref = W.fechaInforme || L, dd = MX.toJS(ref), y1 = dd.getUTCFullYear(), m1 = dd.getUTCMonth(), d0 = MX.toJS(W.inicio || (ref - 90)), ym = d0.getUTCFullYear() * 12 + d0.getUTCMonth(), meses = [];
     for (var k = Math.max(ym, y1 * 12 + m1 - 11); k <= y1 * 12 + m1; k++) {

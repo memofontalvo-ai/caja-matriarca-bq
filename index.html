@@ -1,8 +1,15 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 8.6
+  Flujo de Caja La Matriarca — versión 8.7
 
   HISTORIAL DE VERSIONES
+  v8.7 (17 oct 2026) — Compatible con el Excel nuevo (Round 21): hojas VENTAS, OTROS_INGRESOS y CXC_CLIENTES.
+    · El Excel nuevo reemplazó la hoja INGRESOS por VENTAS (una fila por cierre), OTROS_INGRESOS y
+      CXC_CLIENTES. La app lee los dos formatos: el anterior (INGRESOS) y el nuevo.
+    · Solo lo RECIBIDO (efectivo, tarjeta, transferencia, Davivienda) mueve caja y bancos, igual que en el
+      Excel; los saldos por cuenta coinciden con los del Excel en todas las fechas.
+    · Ventas usa el TOTAL VENTA de cada cierre, con ICO y propina reales (ya no se estiman).
+    · Nuevo en Ventas: «Ventas a crédito por cobrar» (CXC_CLIENTES) y «Cuadre de los cierres».
   v8.6 (15 oct 2026) — Full cost: tabla «Últimas 6 semanas» bien alineada.
     · Columnas fijas y justificadas (números a la derecha), se ajusta al ancho de cualquier
       teléfono o computador, semana en dos líneas (inicio / «al» fin) y fila de Total.
@@ -420,7 +427,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="8.6">
+<meta name="version" content="8.7">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -437,7 +444,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "8.6";
+window.MX_VERSION = "8.7";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1333,7 +1340,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     // Tarjetas
     var icoT = T.ico + T.icoEst;
     h += '\x3csection class="cards3">' +
-      card({ icon: 'ing', title: 'Venta total', sub: 'Lo que se registró en los cierres de caja',
+      card({ icon: 'ing', title: 'Venta total', sub: W.formatoIngresos === 'ventas' ? 'Total venta de cada cierre (incluye ICO y propina)' : 'Lo que se registró en los cierres de caja',
         body: (pt === 'all' ? row('Calle 80', T.c80) + row('Mall Plaza', T.mp) : row(ptNom, T.venta)) + row('Promedio por día', dias.length ? T.venta / dias.length : 0, 'sub'),
         totalLbl: 'Venta total', total: T.venta, tone: 'pos' }) +
       card({ icon: 'imp', title: 'Impoconsumo y propina', sub: 'Se muestran aparte de la venta',
@@ -1347,7 +1354,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var av = [];
     if (primerIco) { var sin = dias.filter(function (x) { return !x.d.icoReg; }).length; if (sin) av.push('El impoconsumo solo está registrado desde el ' + F(primerIco) + '. ' + sin + (sin === 1 ? ' día' : ' días') + ' del período no lo tienen' + (est ? ' y se estimaron al 8% incluido en la venta.' : '; active “Estimar ICO faltante” para calcularlo al 8%.')); }
     else av.push('No hay impoconsumo registrado en este período.');
-    if (!hayProp) av.push('El Excel no registra la propina de cada venta. Para verla aquí, agregue en la hoja INGRESOS una columna “Propina” (y si quiere, “ICO”) junto a cada cierre; la app la leerá sola.');
+    if (!hayProp) av.push('El Excel no registra la propina de cada venta. Para verla aquí, agregue en la hoja INGRESOS (o VENTAS) una columna “Propina” (y si quiere, “ICO”) junto a cada cierre; la app la leerá sola.');
     if (V.icoOtros.length) av.push('No se tomó como ICO del día el registro “' + esc(V.icoOtros[0].desc) + '” por ' + M(V.icoOtros.reduce(function (s, i) { return s + i.v; }, 0)) + ', porque no corresponde a un cierre.');
     if (diasIco.length) { var r = diasIco.reduce(function (s, d) { return s + d.ico; }, 0) / diasIco.reduce(function (s, d) { return s + d.total; }, 0); av.push('En los días con registro, el ICO equivale al ' + (r * 100).toFixed(1).replace('.', ',') + '% de la venta; un ICO del 8% incluido en el precio daría 7,4%.'); }
     h += '\x3cdiv class="alert info">\x3cspan class="ic" aria-hidden="true">i\x3c/span>\x3cb>Sobre estos datos\x3c/b>\x3cul class="av">' + av.map(function (t) { return '\x3cli>' + t + '\x3c/li>'; }).join('') + '\x3c/ul>\x3c/div>';
@@ -1360,6 +1367,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     h += '\x3csection class="cards2">' +
       card({ icon: 'cobrar', title: 'Otros ingresos', sub: 'Plata que entró y no es venta del día · ambos puntos', body: Object.keys(oi).map(function (k) { return row(k, oi[k]); }).join('') + row('Reintegros de MEGAMAS', reintV), totalLbl: 'Total otros ingresos', total: oiT, tone: 'pos' }) +
       card({ icon: 'sum', title: 'Total ingresos', sub: 'Ventas más otros ingresos · ambos puntos', cls: 'big', body: row('Ventas del día (Calle 80 y Mall Plaza)', ventaAmbos) + row('Otros ingresos', oiT), totalLbl: 'Total ingresos', total: ventaAmbos + oiT, tone: 'good' }) + '\x3c/section>';
+    if (W.cxcCli && W.cxcCli.length) {
+      var cxP = W.cxcCli.filter(function (c) { return c.saldo > 0.5; }), cxT = 0, bnT = 0; cxP.forEach(function (c) { if (/bono/i.test(c.tipo)) bnT += c.saldo; else cxT += c.saldo; });
+      var difT = 0; W.vent.forEach(function (v) { if (v.f >= desde && v.f <= D) difT += v.dif; });
+      h += '\x3csection class="cards2">' +
+        card({ icon: 'cobrar', title: 'Ventas a crédito por cobrar', sub: 'Hoja CXC_CLIENTES · informativo, no se suma al Disponible real', body: row('Cuentas por cobrar de clientes (' + cxP.filter(function (c) { return !/bono/i.test(c.tipo); }).length + ')', cxT) + row('Bonos de convenio (' + cxP.filter(function (c) { return /bono/i.test(c.tipo); }).length + ')', bnT), totalLbl: 'Total por cobrar de clientes', total: cxT + bnT }) +
+        card({ icon: 'sum', title: 'Cuadre de los cierres', sub: 'Del período mostrado · ambos puntos', body: row('Venta de los cierres', ventaAmbos) + row('Diferencia sin explicar (venta – recibido – otros medios)', difT, 'sub'), totalLbl: 'Diferencia', total: difT }) + '\x3c/section>';
+    }
     // Medios de pago + propinas pagadas
     var pp = V.propPag.reduce(function (s, p) { return s + (p.pagado || p.valor); }, 0);
     h += '\x3csection class="cards2">' +
@@ -1576,6 +1590,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
   function hoyS() { var d = new Date(); return MX.fromJS(new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))); }
+  function ultReal(D) { var m = 0; W.real.forEach(function (r) { if (r.f <= D && r.f > m) m = r.f; }); W.mega.forEach(function (x) { if (x.f <= D && x.f > m) m = x.f; }); return m || (W.fechaInforme || 0); }
   function authD() { return Math.max(S.D, hoyS()); }
   function esAdminRol() { return window.MX_ROLE === 'admin'; }
   function aKey(x) { var ref = x.cat === 'prov' || x.cat === 'serv' ? x.factura : x.concepto; return [x.cat, x.tercero, String(ref || '').toLowerCase(), (x.cat === 'prov' || x.cat === 'serv') ? (x.fDoc || '') : (x.fProg || '')].join('|'); }
@@ -2113,7 +2128,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     if (R.real.row) bancos = '\x3cdetails class="dr-d">\x3csummary class="dr-r">\x3cspan>Saldo en Caja y Bancos \x3cem>▾ ver\x3c/em>\x3c/span>\x3cb>' + M(caja) + '\x3c/b>\x3c/summary>\x3cdiv class="dr-m dr-bk">' + W.realCols.map(function (c, i) { return R.real.row.v[i] ? '\x3cdiv>\x3csmall>' + esc(c.name) + '\x3c/small>\x3cb>' + M(R.real.row.v[i]) + '\x3c/b>\x3c/div>' : ''; }).join('') + '\x3c/div>\x3c/details>';
     else bancos = row('Saldo en Caja y Bancos', caja);
     var ik = Object.keys(im);
-    var h = '\x3csection class="dr" id="dr">\x3cdiv class="dr-h">\x3cdiv>\x3csmall>La Matriarca · Informe para socios\x3c/small>\x3ch2>Disponible real de efectivo\x3c/h2>\x3c/div>\x3cdiv class="dr-f">\x3csmall>Fecha del informe\x3c/small>\x3cb>' + F(S.D, true) + '\x3c/b>\x3c/div>\x3c/div>' + (W.fechaInforme && W.fechaInforme < S.D ? '\x3cp class="note" style="margin:4px 2px">Saldos de caja, bancos y MEGAMAS: según el Excel del ' + F(W.fechaInforme, true) + '. Los vencimientos se cuentan a la fecha del informe.\x3c/p>' : '');
+    var h = '\x3csection class="dr" id="dr">\x3cdiv class="dr-h">\x3cdiv>\x3csmall>La Matriarca · Informe para socios\x3c/small>\x3ch2>Disponible real de efectivo\x3c/h2>\x3c/div>\x3cdiv class="dr-f">\x3csmall>Fecha del informe\x3c/small>\x3cb>' + F(S.D, true) + '\x3c/b>\x3c/div>\x3c/div>' + (ultReal(S.D) && ultReal(S.D) < S.D ? '\x3cp class="note" style="margin:4px 2px">Saldos de caja, bancos y MEGAMAS: según el Excel del ' + F(ultReal(S.D), true) + '. Los vencimientos se cuentan a la fecha del informe.\x3c/p>' : '');
     if (cargando) h += '\x3cdiv class="dr-w">Leyendo la autorización guardada…\x3c/div>';
     else if (!doc) h += '\x3cdiv class="dr-w">Sin autorización guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + ': no se descuenta ningún pago.\x3c/div>';
     h += '\x3cdiv class="dr-c">' + bancos + row('Caja MEGAMAS', mega) + band('Total disponible', total, 'ok') + '\x3c/div>' +
@@ -2124,7 +2139,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       '\x3cdiv class="dr-hero' + (real < 0 ? ' neg' : '') + '">\x3csmall>Disponible real\x3c/small>\x3cb>' + M(real) + '\x3c/b>\x3c/div>' +
       '\x3cdiv class="dr-c">' + band('(+) Otras cuentas por cobrar', otras, 'ok') + cxcCeldas(R) + cxcPanel(R) +
       '\x3c/div>\x3cdiv class="dr-hero2' + (real + otras < 0 ? ' neg' : '') + '">\x3csmall>Disponible real + cuentas por cobrar\x3c/small>\x3cb>' + M(real + otras) + '\x3c/b>\x3c/div>';
-    var corteX = W.fechaInforme && W.fechaInforme < S.D ? 'Saldos de caja, bancos y MEGAMAS según el Excel del ' + F(W.fechaInforme, true) + '. ' : '';
+    var corteX = ultReal(S.D) && ultReal(S.D) < S.D ? 'Saldos de caja, bancos y MEGAMAS según el Excel del ' + F(ultReal(S.D), true) + '. ' : '';
     var nota = corteX + (doc ? nPendT + ' pagos por pagar de ' + doc.n + ' autorizados · semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + (doc.fechaPago ? ' · pagos para el ' + F(doc.fechaPago, true) : '') + ' · autorizó ' + (doc.por || '') + ' · guardado ' + String(stampLargo(doc.guardadoISO)).replace(/\.$/, '') + (doc.retirados && doc.retirados.length ? ' · ' + doc.retirados.length + ' retiradas' : '') + '. Lo no autorizado no se descuenta.' : 'Sin autorización guardada para la semana del ' + F(L) + ' al ' + F(L + 6) + ': no se descuenta ningún pago.');
     S._dr = { fecha: F(S.D, true), caja: caja, mega: mega, total: total, aut: aut, g: g, imp: imp, im: im, real: real, otras: otras, cxc: { emp: R.cxc.emp, soc: R.cxc.soc, otr: R.cxc.otr }, sem: F(L) + ' – ' + F(L + 6), nota: nota, d: iso(S.D) };
     if (doc) h += '\x3cp class="dr-n">' + nPendT + ' pagos por pagar de ' + doc.n + ' autorizados · semana ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + (doc.fechaPago ? ' · pagos para el ' + F(doc.fechaPago, true) : '') + ' · autorizó ' + esc(doc.por || '') + ' · guardado ' + esc(String(stampLargo(doc.guardadoISO)).replace(/\.$/, '')) + (doc.retirados && doc.retirados.length ? ' · ' + doc.retirados.length + ' retiradas' : '') + '. Lo no autorizado no se descuenta.\x3c/p>';
@@ -3277,8 +3292,9 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     fr.onload = function () {
       try {
         var wb = XLSX.read(new Uint8Array(fr.result), { type: 'array' });
-        var need = ['BANCOS', 'PROVEEDORES', 'SERVICIOS', 'PERSONAL', 'GASTOS_VARIOS', 'INGRESOS', 'CUENTAS_POR_COBRAR', 'DISPONIBLE REAL'];
+        var need = ['BANCOS', 'PROVEEDORES', 'SERVICIOS', 'PERSONAL', 'GASTOS_VARIOS', 'CUENTAS_POR_COBRAR', 'DISPONIBLE REAL'];
         var miss = need.filter(function (n) { return !wb.Sheets[n]; });
+        if (!wb.Sheets.INGRESOS && !(wb.Sheets.VENTAS && wb.Sheets.OTROS_INGRESOS)) miss.push(wb.Sheets.VENTAS ? 'OTROS_INGRESOS' : 'INGRESOS (o VENTAS y OTROS_INGRESOS)');
         if (miss.length) throw new Error('Al archivo le faltan las hojas: ' + miss.join(', ') + '. Cargue el Excel de Tesorería Integrada.');
         var get = function (s, a) { var ws = wb.Sheets[s]; if (!ws) return undefined; var c = ws[a]; return c ? c.v : undefined; };
         var maxRow = function (s) { var ws = wb.Sheets[s]; if (!ws || !ws['!ref']) return 0; return XLSX.utils.decode_range(ws['!ref']).e.r + 1; };
@@ -3396,14 +3412,44 @@ var MX = (function () {
       });
     }
     W.pay.forEach(function (p) { if (!p.fDoc) p.fDoc = p.fProg || p.fPago; });
-    // Ingresos
-    W.ing = [];
+    // Ingresos. Formato anterior: hoja INGRESOS. Formato nuevo (Round 21): VENTAS (una fila por cierre) + OTROS_INGRESOS + CXC_CLIENTES.
+    W.ing = []; W.vent = []; W.cxcCli = [];
+    W.formatoIngresos = maxRow('VENTAS') > 0 && /ventas/i.test(str(get('VENTAS', 'A1'))) ? 'ventas' : 'ingresos';
+    var optIco = null, optProp = null, optNeta = null, INGS = W.formatoIngresos === 'ventas' ? 'OTROS_INGRESOS' : 'INGRESOS';
     // Columnas opcionales en INGRESOS (fila 4): "ICO"/"Impoconsumo", "Propina", "Venta neta"
-    var optIco = null, optProp = null, optNeta = null;
-    for (var oc = 10; oc <= 30; oc++) { var oh = str(get('INGRESOS', colName(oc) + '4')).toLowerCase(); if (!oh) continue; if (/propina/.test(oh)) optProp = colName(oc); else if (/neta|base|sin imp/.test(oh)) optNeta = colName(oc); else if (/\bico\b|impoconsumo|impuesto/.test(oh)) optIco = colName(oc); }
+    for (var oc = 10; oc <= 30; oc++) { var oh = str(get(INGS, colName(oc) + '4')).toLowerCase(); if (!oh) continue; if (/propina/.test(oh)) optProp = colName(oc); else if (/neta|base|sin imp/.test(oh)) optNeta = colName(oc); else if (/\bico\b|impoconsumo|impuesto/.test(oh)) optIco = colName(oc); }
     W.ingCols = { ico: !!optIco, prop: !!optProp, neta: !!optNeta };
-    rows('INGRESOS', 5, 5000, function (g) { var f = dte(g('A')); var v = num(g('G')); if (!f || !v) return; var o = { f: f, tipo: str(g('B')), cliente: str(g('C')), desc: str(g('D')), medio: str(g('E')), banco: str(g('F')), v: v, obs: str(g('H')), punto: str(g('I')) };
+    rows(INGS, 5, 5000, function (g) { var f = dte(g('A')); var v = num(g('G')); if (!f || !v) return; var o = { f: f, tipo: str(g('B')), cliente: str(g('C')), desc: str(g('D')), medio: str(g('E')), banco: str(g('F')), v: v, obs: str(g('H')), punto: str(g('I')) };
       if (optIco) o.ico = num(g(optIco)); if (optProp) o.prop = num(g(optProp)); if (optNeta) o.neta = num(g(optNeta)); W.ing.push(o); });
+    if (W.formatoIngresos === 'ventas') {
+      W.ingCols = { ico: true, prop: true, neta: false };
+      // Las columnas se buscan por el nombre del encabezado (fila 4), con la letra de la versión actual como respaldo
+      var VH = {}; for (var vc = 1; vc <= 40; vc++) { var vh = str(get('VENTAS', colName(vc) + '4')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); if (vh && !VH[vh]) VH[vh] = colName(vc); }
+      function vcol(re, dflt) { for (var k in VH) if (re.test(k)) return VH[k]; return dflt; }
+      var VC = { f: vcol(/^fecha/, 'A'), pt: vcol(/^punto/, 'B'), ci: vcol(/^cierre/, 'C'), tu: vcol(/^turno/, 'D'), al: vcol(/^alimentos/, 'E'), be: vcol(/^bebidas/, 'F'), ot: vcol(/^otros \/ sin/, 'G'), de: vcol(/^descuentos/, 'H'), co: vcol(/^cortesias$/, 'I'), pr: vcol(/^propinas?/, 'J'), ico: vcol(/^ico/, 'K'), tv: vcol(/^total venta/, 'L'),
+        ef: vcol(/^efectivo/, 'M'), ta: vcol(/^tarjeta/, 'N'), tr: vcol(/^transferencia/, 'O'), da: vcol(/^davivienda/, 'P'), tr2: vcol(/^total recibido/, 'Q'), cx: vcol(/^cxc clientes/, 'R'), bo: vcol(/^bono/, 'S'), gi: vcol(/^gift/, 'T'), ab: vcol(/^abono/, 'U'), cd: vcol(/^cortesia \/ desc/, 'V'), dif: vcol(/^diferencia/, 'X'), ob: vcol(/^observaciones/, 'Y'), cE: vcol(/^cuenta efectivo/, 'Z'), cB: vcol(/^cuenta banco/, 'AA'), cD: vcol(/^cuenta davivienda/, 'AB') };
+      var cfg = {}; for (var cr = 2; cr <= 12; cr++) { var cp = str(get('CONFIG', 'N' + cr)).toUpperCase(); if (cp) cfg[cp] = { ef: str(get('CONFIG', 'O' + cr)), ba: str(get('CONFIG', 'P' + cr)) }; }
+      rows('VENTAS', 5, 5000, function (g) {
+        var f = dte(g(VC.f)); if (!f) return;
+        var pt = str(g(VC.pt)).toUpperCase(), mall = /MALL/.test(pt);
+        var o = { f: f, punto: mall ? 'MALL PLAZA' : 'CALLE 80', cierre: str(g(VC.ci)), turno: str(g(VC.tu)), ali: num(g(VC.al)), beb: num(g(VC.be)), otr: num(g(VC.ot)), desc: num(g(VC.de)), cort: num(g(VC.co)), prop: num(g(VC.pr)), ico: num(g(VC.ico)), obs: str(g(VC.ob)) };
+        var tv = g(VC.tv); o.venta = (typeof tv === 'number') ? tv : (o.ali + o.beb + o.otr - o.desc - o.cort + o.prop + o.ico);
+        o.med = { Efectivo: num(g(VC.ef)), Tarjeta: num(g(VC.ta)), Transferencia: num(g(VC.tr)), Davivienda: num(g(VC.da)) };
+        o.recibido = o.med.Efectivo + o.med.Tarjeta + o.med.Transferencia + o.med.Davivienda;
+        o.otrosMed = { 'Cuentas por cobrar (clientes)': num(g(VC.cx)), 'Bono Coomeva / convenio': num(g(VC.bo)), 'Gift card redimida': num(g(VC.gi)), 'Abono / anticipo aplicado': num(g(VC.ab)), 'Cortesía / descuento de bono': num(g(VC.cd)) };
+        o.dif = o.venta - o.recibido - sum(Object.keys(o.otrosMed), function (k) { return o.otrosMed[k]; });
+        if (!o.venta && !o.recibido) return;
+        W.vent.push(o);
+        var c0 = cfg[o.punto] || {}, cEf = str(g(VC.cE)) || c0.ef || (mall ? 'Caja Mall Plaza' : 'Caja General'), cBa = str(g(VC.cB)) || c0.ba || (mall ? 'Bancolombia Mall Plaza' : 'Bancolombia'), cDa = str(g(VC.cD)) || 'Davivienda';
+        // Solo lo RECIBIDO mueve caja y bancos: una fila por medio, como en la hoja INGRESOS anterior
+        [['Efectivo', cEf], ['Tarjeta', cBa], ['Transferencia', cBa], ['Davivienda', cDa]].forEach(function (m) {
+          if (!o.med[m[0]]) return;
+          W.ing.push({ f: f, tipo: 'Venta del dia ' + (mall ? 'MALL PLAZA' : 'Calle 80'), cliente: 'CLIENTE', desc: o.cierre, medio: m[0], banco: m[1], v: o.med[m[0]], obs: o.obs, punto: o.punto, deVentas: true });
+        });
+      });
+      // CXC_CLIENTES: ventas a crédito y bonos de convenio por cobrar (informativo)
+      rows('CXC_CLIENTES', 5, 5000, function (g) { var f = dte(g('A')); var v = num(g('F')); if (!f || !v) return; var pag = num(g('H')); W.cxcCli.push({ f: f, punto: str(g('B')), cierre: str(g('C')), tipo: str(g('D')), cliente: str(g('E')), valor: v, fPago: dte(g('G')), pagado: pag, saldo: g('I') != null && g('I') !== '' ? num(g('I')) : v - pag, obs: str(g('K')) }); });
+    }
     // CxC manual
     W.cxc = [];
     rows('CXC', 3, 400, function (g) { var f = dte(g('A')); if (!f) return; W.cxc.push({ f: f, emp: num(g('B')), soc: num(g('C')), otr: num(g('D')) }); });
@@ -3635,9 +3681,21 @@ var MX = (function () {
     var dias = {};
     function Dd(f) { return dias[f] || (dias[f] = { f: f, c80: 0, mp: 0, ico: 0, icoC80: 0, icoMP: 0, prop: 0, propC80: 0, propMP: 0, neta: null, medios: {}, cierres: [], icoReg: false }); }
     var icoOtros = [];
+    var conVent = !!(W.vent && W.vent.length);
+    if (conVent) W.vent.forEach(function (v) {
+      if (v.f < desde || v.f > hasta) return;
+      var d = Dd(v.f), mp = v.punto === 'MALL PLAZA';
+      if (mp) { d.mp += v.venta; d.icoMP += v.ico; d.propMP += v.prop; } else { d.c80 += v.venta; d.icoC80 += v.ico; d.propC80 += v.prop; }
+      d.ico += v.ico; d.prop += v.prop; if (v.ico) d.icoReg = true; d.neta = (d.neta || 0) + (v.venta - v.ico - v.prop);
+      function mm(medio, val, banco) { if (!val) return; d.medios[medio] = (d.medios[medio] || 0) + val; d.cierres.push({ pt: v.punto, desc: v.cierre, obs: v.obs, medio: medio, banco: banco || '', v: val }); }
+      Object.keys(v.med).forEach(function (k) { mm(k, v.med[k]); });
+      Object.keys(v.otrosMed).forEach(function (k) { mm(k, v.otrosMed[k]); });
+      if (Math.abs(v.dif) > 0.5) mm('Diferencia del cierre (venta – recibido)', v.dif);
+    });
     W.ing.forEach(function (i) {
       if (i.f < desde || i.f > hasta) return;
       if (/^venta/i.test(i.tipo)) {
+        if (conVent) return;
         var d = Dd(i.f), pt = puntoIng(i);
         if (pt === 'MALL PLAZA') d.mp += i.v; else d.c80 += i.v;
         d.medios[i.medio || 'Otro'] = (d.medios[i.medio || 'Otro'] || 0) + i.v;
@@ -3986,7 +4044,7 @@ if (typeof module !== 'undefined') module.exports = MX;
       fr.onload = function () {
         try {
           var wb = XLSX.read(new Uint8Array(fr.result), { type: 'array' });
-          if (!wb.Sheets.BANCOS || !wb.Sheets.PROVEEDORES || !wb.Sheets.INGRESOS) throw new Error('Este archivo no tiene la estructura de Tesorería Integrada (faltan hojas BANCOS, PROVEEDORES o INGRESOS).');
+          if (!wb.Sheets.BANCOS || !wb.Sheets.PROVEEDORES || !(wb.Sheets.INGRESOS || (wb.Sheets.VENTAS && wb.Sheets.OTROS_INGRESOS))) throw new Error('Este archivo no tiene la estructura de Tesorería Integrada (faltan hojas BANCOS, PROVEEDORES o INGRESOS / VENTAS).');
           var get = function (s, a) { var ws = wb.Sheets[s]; if (!ws) return undefined; var c = ws[a]; return c ? c.v : undefined; };
           var maxRow = function (s) { var ws = wb.Sheets[s]; if (!ws || !ws['!ref']) return 0; return XLSX.utils.decode_range(ws['!ref']).e.r + 1; };
           var nw = MX.parse(get, maxRow); nw.archivoNombre = file.name; window.MX_LASTXLS = { name: file.name, buf: fr.result }; ok(nw);

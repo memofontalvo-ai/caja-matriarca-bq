@@ -1,8 +1,11 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 8.7
+  Flujo de Caja La Matriarca — versión 8.8
 
   HISTORIAL DE VERSIONES
+  v8.8 (19 oct 2026) — Pagos autorizados: cada proveedor muestra el total de lo que va marcado.
+    · Al chulear facturas de un proveedor, el valor grande es la suma de las marcadas y debajo
+      dice «n marcadas · de $X pendiente». Sin marcas se ve el total pendiente, como antes.
   v8.7 (17 oct 2026) — Compatible con el Excel nuevo (Round 21): hojas VENTAS, OTROS_INGRESOS y CXC_CLIENTES.
     · El Excel nuevo reemplazó la hoja INGRESOS por VENTAS (una fila por cierre), OTROS_INGRESOS y
       CXC_CLIENTES. La app lee los dos formatos: el anterior (INGRESOS) y el nuevo.
@@ -427,7 +430,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="8.7">
+<meta name="version" content="8.8">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -444,7 +447,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "8.7";
+window.MX_VERSION = "8.8";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -963,6 +966,9 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
 .fcw-h{font-weight:700;padding:6px 0 8px;border-bottom:2px solid var(--line,#e3e5e1)}
 .fcw-h>span{font-size:clamp(10.5px,3vw,12.5px)!important;opacity:.8;text-transform:none}
 .fcw-t{border-top:2px solid var(--line,#cfd3cd);font-weight:700;background:rgba(0,0,0,.025)}
+
+/* v8.8 Programación: total marcado por proveedor */
+.party .tot.sel{color:var(--ok,#2f7a4f)}
 
 /* Pantallas de marca: fondo verde con la imagen de La Matriarca */
 :root{--gold:#C9A35A;--gold-soft:#E4CC93;--cream:#F4ECDA;--deep:#0C3322;--glass:rgba(7,34,22,.74);--glass-line:rgba(201,163,90,.35)}
@@ -1833,8 +1839,8 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
           var key = 'ap|' + k + '|' + t.name, nv = t.items.filter(function (i) { return i.d != null && i.d > 0; }).length, ns = t.items.filter(function (i) { return S.aSel[i.k]; }).length;
           PG.push(t.items.map(function (i) { return i.k; })); var pi = PG.length - 1; PK.push(key);
           var abierto = !!S.open[key] || !!q || S.gF === 'marc';
-          return '\x3cdetails class="party' + (nv ? ' pv' : '') + '" data-k="' + esc(key) + '"' + (abierto ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot">' + M(t.saldo) + '\x3c/span>' +
-            '\x3cspan class="sub">' + (nv ? chip('rojo', nv + (nv === 1 ? ' vencida' : ' vencidas')) : chip('verde', 'Al día')) + '\x3cspan>' + (function () { var nn = t.items.filter(function (i) { return i.nc; }).length, nf = t.items.length - nn; return nf + (nf === 1 ? ' factura' : ' facturas') + (nn ? ' + ' + nn + (nn === 1 ? ' nota crédito' : ' notas crédito') : ''); })() + '\x3c/span>' + (ns ? '\x3cspan>\x3cb>' + ns + ' marcadas\x3c/b>\x3c/span>' : '') + '\x3c/span>\x3c/summary>' +
+          return '\x3cdetails class="party' + (nv ? ' pv' : '') + '" data-k="' + esc(key) + '"' + (abierto ? ' open' : '') + '>\x3csummary>\x3cspan class="nm">' + esc(t.name) + '\x3c/span>\x3cspan class="tot' + (ns ? ' sel' : '') + '">' + M(ns ? suma(t.items.filter(function (i) { return S.aSel[i.k]; })) : t.saldo) + '\x3c/span>' +
+            '\x3cspan class="sub">' + (nv ? chip('rojo', nv + (nv === 1 ? ' vencida' : ' vencidas')) : chip('verde', 'Al día')) + '\x3cspan>' + (function () { var nn = t.items.filter(function (i) { return i.nc; }).length, nf = t.items.length - nn; return nf + (nf === 1 ? ' factura' : ' facturas') + (nn ? ' + ' + nn + (nn === 1 ? ' nota crédito' : ' notas crédito') : ''); })() + '\x3c/span>' + (ns ? '\x3cspan>\x3cb>' + ns + ' marcadas\x3c/b> · de ' + M(t.saldo) + ' pendiente\x3c/span>' : '') + '\x3c/span>\x3c/summary>' +
             '\x3cdiv class="ckl">\x3cdiv class="ck-tools" style="padding:8px 14px;border-top:1px solid var(--line)">\x3cspan class="meta">' + esc(t.name) + '\x3c/span>\x3cbutton class="btn" data-pall="' + pi + '">' + (ns === t.items.length ? 'Quitar marcas' : 'Marcar todas') + '\x3c/button>\x3c/div>' +
             (function () { var base = ordItems(t.items.filter(function (i) { return !i.ligada; })), rows = []; base.forEach(function (i) { rows.push(i); (ncOf[i.k] || []).forEach(function (n) { rows.push(n); }); }); return rows; })().map(function (i) {
               var x = i.x, on = !!S.aSel[i.k];

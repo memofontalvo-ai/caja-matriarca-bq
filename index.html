@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 9.3
+  Flujo de Caja La Matriarca — versión 9.4
 
   HISTORIAL DE VERSIONES
+  v9.4 (23 oct 2026) — Personal ordenado por concepto.
+    · El Personal ya no sale mezclado: se agrupa según el «Concepto» del Excel en Nómina (personal fijo: salario, seguridad social, bonificación), Personal extra (turnos), Músicos, Propinas, Honorarios y Otros.
+    · Cada grupo tiene su propio total y su botón «Marcar todo» en Autorizar pagos, Programación, Aplicación de pagos, Programado vs pagado, el informe de autorización, el PDF y el texto para compartir.
+    · En Por pagar, la tarjeta «Personal por grupo» muestra cada grupo y al tocarla filtra el detalle.
   v9.3 (21 oct 2026) — Excel Round 23: hoja RETIROS_SOCIOS.
     · La app lee la hoja RETIROS_SOCIOS (una fila por socio y retiro) y trata cada retiro como un rubro más: «Retiro de socios».
     · Aparece en Por pagar, Egresos, Programación, Autorizar pagos, Programado vs pagado, Disponible real, Flujo semanal y Flujo 14 días.
@@ -446,7 +450,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="9.3">
+<meta name="version" content="9.4">
 <title>Flujo de Caja La Matriarca</title>
 <script>
 /* =====================================================================
@@ -463,7 +467,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "9.3";
+window.MX_VERSION = "9.4";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1489,6 +1493,28 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   }
   /* ---------- POR PAGAR ---------- */
   var CATN = { prov: 'Proveedores', serv: 'Servicios', pers: 'Personal', gast: 'Gastos varios', obl: 'Obligaciones financieras', ret: 'Retiro de socios' };
+  /* v9.4 Personal ordenado por concepto del Excel (columna «Concepto»): nómina fija, personal extra, músicos, propinas, honorarios */
+  var PERS_G = [['nom', 'Nómina · personal fijo'], ['ext', 'Personal extra (turnos)'], ['mus', 'Músicos'], ['pro', 'Propinas'], ['hon', 'Honorarios'], ['otr', 'Otros del personal']];
+  function persG(x) {
+    var c = String(x.concepto || '').toLowerCase(), t = String(x.sub || '').toLowerCase();
+    if (/propina/.test(c)) return 'pro';
+    if (/m[uú]sic/.test(c) || /m[uú]sic/.test(t)) return 'mus';
+    if (/turno|extra/.test(c)) return 'ext';
+    if (/salario|n[oó]mina|seguridad|bonific|prima|cesant|vacac|liquidac|dotaci/.test(c)) return 'nom';
+    if (/honorario|asesor/.test(c)) return 'hon';
+    return 'otr';
+  }
+  function persGNm(g) { for (var i = 0; i < PERS_G.length; i++) if (PERS_G[i][0] === g) return PERS_G[i][1]; return 'Personal'; }
+  function okK(k, x) { var p = String(k).split('~'); return p.length > 1 ? x.cat === 'pers' && persG(x) === p[1] : x.cat === k; }
+  function BLQ() {
+    var o = [];
+    Object.keys(CATN).forEach(function (c) {
+      if (c === 'pers') PERS_G.forEach(function (g) { o.push({ k: 'pers~' + g[0], cat: 'pers', nm: g[1] }); });
+      else o.push({ k: c, cat: c, nm: CATN[c] });
+    });
+    return o;
+  }
+  function icoK(c) { return c === 'prov' ? 'pagos' : c === 'serv' ? 'imp' : c === 'pers' ? 'res' : 'dist'; }
   function estado(p, D) { if (!p.fProg) return 'sin'; if (p.fProg < D) return 'venc'; if (p.fProg === D) return 'hoy'; return 'fut'; }
   function vPagar(R) {
     var D = S.D;
@@ -1517,10 +1543,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     h += '\x3csection class="sec" id="detalle">\x3cdiv class="sec-head">\x3ch2>Detalle por tercero\x3c/h2>\x3c/div>\x3cdiv class="filters">' +
       seg('cat', [['all', 'Todo'], ['prov', 'Proveedores'], ['pers', 'Personal'], ['serv', 'Servicios'], ['gast', 'Gastos'], ['obl', 'Obligaciones'], ['ret', 'Retiros']]) +
       seg('est', [['pend', 'Todo pendiente'], ['venc', 'Vencido'], ['hoy', 'Hoy'], ['fut', 'Más adelante'], ['sin', 'Sin fecha']]) +
+      (S.pg ? '\x3cbutton class="btn" id="pg-x">Solo: ' + esc(persGNm(S.pg)) + ' ✕\x3c/button>' : '') +
       '\x3cinput class="search" id="q" type="search" placeholder="Buscar proveedor, factura, NIT…" value="' + esc(S.q) + '">\x3c/div>';
     var q = S.q.toLowerCase();
     var f = rows.filter(function (p) {
       if (S.cat !== 'all' && p.cat !== S.cat) return false;
+      if (S.pg && !(p.cat === 'pers' && persG(p) === S.pg)) return false;
       if (S.est !== 'pend' && estado(p, D) !== S.est) return false;
       if (q && (p.tercero + ' ' + p.factura + ' ' + (p.nit || '') + ' ' + p.concepto + ' ' + p.sub).toLowerCase().indexOf(q) < 0) return false;
       return true;
@@ -1564,13 +1592,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     return '\x3csection class="sec">\x3cdiv class="sec-head">\x3ch2>Obligaciones financieras\x3c/h2>\x3cspan class="meta">Créditos y leasing · cada cuota se programa el primer día hábil de su mes\x3c/span>\x3c/div>\x3cdiv class="panel">' + rows + '\x3c/div>\x3cdiv class="sumline">\x3cspan>Saldo de capital de todas las obligaciones\x3c/span>\x3cb>' + M(tc) + '\x3c/b>\x3c/div>\x3c/section>';
   }
   function tiposCards() {
-    function porTipo(cat) { var t = {}; W.pay.forEach(function (p) { if (p.cat === cat && p.saldo) { var k = p.sub || 'Sin clasificar'; t[k] = (t[k] || 0) + p.saldo; } }); return Object.keys(t).map(function (k) { return [k, t[k]]; }).sort(function (a, b) { return b[1] - a[1]; }); }
+    function porTipo(cat) { var t = {}; W.pay.forEach(function (p) { if (p.cat === cat && p.saldo) { var k = cat === 'pers' ? persGNm(persG(p)) : (p.sub || 'Sin clasificar'); t[k] = (t[k] || 0) + p.saldo; } }); return Object.keys(t).map(function (k) { return [k, t[k]]; }).sort(function (a, b) { return b[1] - a[1]; }); }
     function porRet() { var t = {}; W.pay.forEach(function (p) { if (p.cat === 'ret' && p.saldo) { var k = p.periodo || 'Sin periodo'; t[k] = (t[k] || 0) + p.saldo; } }); return Object.keys(t).map(function (k) { return [k, t[k]]; }).sort(function (a, b) { return b[1] - a[1]; }); }
     function body(cat, rows) { return rows.length ? rows.map(function (r) { return '\x3cbutton class="row row-btn" data-tipo="' + cat + '|' + esc(r[0]) + '">\x3cspan>' + esc(r[0]) + ' ›\x3c/span>' + amt(r[1]) + '\x3c/button>'; }).join('') : '\x3cdiv class="empty">Nada pendiente.\x3c/div>'; }
     var a = porTipo('prov'), b = porTipo('serv'), c = porTipo('gast'), d = porTipo('pers'), o = porTipo('obl'), rt = porRet();
     var sumT = function (r) { return r.reduce(function (s, x) { return s + x[1]; }, 0); };
     var extra = (c.length ? card({ icon: 'deuda', title: 'Gastos varios por categoría', sub: 'Mantenimiento, transporte, otros', body: body('gast', c), totalLbl: 'Total gastos varios', total: sumT(c) }) : '') +
-      (d.length ? card({ icon: 'deuda', title: 'Personal por tipo', sub: 'Nómina, turnos, prestadores', body: body('pers', d), totalLbl: 'Total personal', total: sumT(d) }) : '') +
+      (d.length ? card({ icon: 'deuda', title: 'Personal por grupo', sub: 'Nómina fija, personal extra, músicos y propinas', body: body('pers', d), totalLbl: 'Total personal', total: sumT(d) }) : '') +
       (o.length ? card({ icon: 'imp', title: 'Obligaciones financieras', sub: 'Cuotas de créditos y leasing · cada cuota se programa el 1er día hábil del mes', body: body('obl', o), totalLbl: 'Total obligaciones', total: sumT(o) }) : '') +
       (rt.length ? card({ icon: 'deuda', title: 'Retiros de socios por periodo', sub: 'Distribución de utilidades pendiente de entregar', body: body('ret', rt), totalLbl: 'Total retiros', total: sumT(rt) }) : '');
     return '\x3csection class="cards2">' +
@@ -1776,15 +1804,15 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   }
   function textoAut(doc) {
     var L = ['AUTORIZACIÓN DE PAGOS · La Matriarca', 'Semana: ' + F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + MX.toJS(doc.lunes).getUTCFullYear(), doc.codigo ? 'Programación: ' + doc.codigo : '', doc.fechaPago ? 'Pagos para el ' + F(doc.fechaPago, true) : '', 'Autorizó: ' + (doc.por || '') + ' · ' + stampLargo(doc.guardadoISO), ''].filter(function (s, i) { return s !== '' || i === 4; });
-    Object.keys(CATN).forEach(function (k) {
-      var its = doc.items.filter(function (x) { return x.cat === k; }); if (!its.length) return;
-      L.push('== ' + CATN[k].toUpperCase() + ' ==');
+    BLQ().forEach(function (B) {
+      var k = B.k, its = doc.items.filter(function (x) { return okK(k, x); }); if (!its.length) return;
+      L.push('== ' + B.nm.toUpperCase() + ' ==');
       var g = {}, ord = []; its.forEach(function (x) { var kk = (x.tercero || '').toLowerCase(); if (!g[kk]) { g[kk] = { name: x.tercero || '(sin nombre)', items: [] }; ord.push(kk); } g[kk].items.push(x); });
       ord.forEach(function (kk) { var t = g[kk];
         L.push(t.name + ' — ' + M(t.items.reduce(function (s2, x) { return s2 + x.saldo; }, 0)));
         t.items.forEach(function (x) { L.push('   · ' + refDe(x) + (x.venc != null ? ' · vence ' + F(x.venc) : '') + (x.dias != null && x.dias > 0 ? ' · VENCIDA ' + x.dias + ' d' : '') + ' · ' + M(x.saldo)); });
       });
-      L.push('Subtotal ' + CATN[k].toLowerCase() + ': ' + M(its.reduce(function (s2, x) { return s2 + x.saldo; }, 0)), '');
+      L.push('Subtotal ' + B.nm.toLowerCase() + ': ' + M(its.reduce(function (s2, x) { return s2 + x.saldo; }, 0)), '');
     });
     if (rangoDoc(doc)) L.push('Rango de vencimiento: ' + rangoDoc(doc));
     L.push('TOTAL AUTORIZADO: ' + M(doc.total) + ' (' + doc.n + (doc.n === 1 ? ' pago' : ' pagos') + ')');
@@ -1867,18 +1895,18 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     function chipVi(i) { return i.d == null ? chip('neutro', 'Sin vencimiento') : i.d > 0 ? chip('rojo', 'VENCIDA ' + i.d + (i.d === 1 ? ' día' : ' días')) : i.d === 0 ? chip('amarillo', 'Vence hoy') : chip(i.d >= -7 ? 'amarillo' : 'neutro', 'Vence en ' + (-i.d) + (i.d === -1 ? ' día' : ' días')); }
     function maxD(a) { return a.reduce(function (m, i) { return Math.max(m, i.d == null ? -9999 : i.d); }, -9999); }
     function ordItems(a) { return a.slice().sort(function (p, q2) { return S.gOrd === 'valor' ? q2.x.saldo - p.x.saldo : S.gOrd === 'nom' ? refDe(p.x).localeCompare(refDe(q2.x), 'es') : ((q2.d == null ? -9999 : q2.d) - (p.d == null ? -9999 : p.d)) || q2.x.saldo - p.x.saldo; }); }
-    var bq = Object.keys(CATN).map(function (k) {
-      var its = ff.filter(function (i) { return i.x.cat === k; }); if (!its.length) return '';
+    var bq = BLQ().map(function (B) {
+      var k = B.k, its = ff.filter(function (i) { return okK(k, i.x); }); if (!its.length) return '';
       var g = {}; its.forEach(function (i) { var kk = (i.x.tercero || '').toLowerCase(); var t = g[kk] || (g[kk] = { name: i.x.tercero || '(sin nombre)', items: [] }); t.items.push(i); });
       var gl = Object.keys(g).map(function (kk) { var t = g[kk]; t.saldo = suma(t.items); t.max = maxD(t.items); return t; }).sort(function (p, q2) { return S.gOrd === 'valor' ? q2.saldo - p.saldo : S.gOrd === 'nom' ? p.name.localeCompare(q2.name, 'es') : (q2.max - p.max) || (q2.saldo - p.saldo); });
       var bkey = 'ba|' + k, nV = its.filter(function (i) { return i.d != null && i.d > 0; }), sB = its.filter(function (i) { return S.aSel[i.k]; });
       PG.push(its.map(function (i) { return i.k; })); var bi = PG.length - 1;
       BK.push(bkey);
       var open = !!S.open[bkey];
-      return '\x3cdetails class="card blk" data-bk="' + esc(bkey) + '"' + (open ? ' open' : '') + '>\x3csummary class="blk-s">' + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') +
-        '\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + nD(its.length).replace('pago', 'factura') + (nV.length ? ' · \x3cspan class="neg">' + nV.length + ' vencidas\x3c/span>' : '') + (sB.length ? ' · ' + sB.length + ' marcadas' : '') + '\x3c/small>\x3c/div>' +
+      return '\x3cdetails class="card blk" data-bk="' + esc(bkey) + '"' + (open ? ' open' : '') + '>\x3csummary class="blk-s">' + ico(icoK(B.cat)) +
+        '\x3cdiv class="card-t">\x3ch3>' + B.nm + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + nD(its.length).replace('pago', 'factura') + (nV.length ? ' · \x3cspan class="neg">' + nV.length + ' vencidas\x3c/span>' : '') + (sB.length ? ' · ' + sB.length + ' marcadas' : '') + '\x3c/small>\x3c/div>' +
         '\x3cdiv class="blk-t">\x3csmall>Total pendiente\x3c/small>\x3cstrong>' + M(suma(its)) + '\x3c/strong>\x3c/div>\x3cspan class="chev" aria-hidden="true">›\x3c/span>\x3c/summary>' +
-        '\x3cdiv class="ck-tools" style="padding:10px 14px">\x3cspan class="meta">Marcadas: ' + sB.length + ' · ' + M(suma(sB)) + '\x3c/span>\x3cspan>\x3cbutton class="btn" data-pall="' + bi + '">' + (sB.length === its.length ? 'Quitar marcas' : 'Marcar todo ' + CATN[k].toLowerCase()) + '\x3c/button>\x3c/span>\x3c/div>' +
+        '\x3cdiv class="ck-tools" style="padding:10px 14px">\x3cspan class="meta">Marcadas: ' + sB.length + ' · ' + M(suma(sB)) + '\x3c/span>\x3cspan>\x3cbutton class="btn" data-pall="' + bi + '">' + (sB.length === its.length ? 'Quitar marcas' : 'Marcar todo ' + B.nm.toLowerCase()) + '\x3c/button>\x3c/span>\x3c/div>' +
         '\x3cdiv class="parties flat">' + gl.map(function (t) {
           var key = 'ap|' + k + '|' + t.name, nv = t.items.filter(function (i) { return i.d != null && i.d > 0; }).length, ns = t.items.filter(function (i) { return S.aSel[i.k]; }).length;
           PG.push(t.items.map(function (i) { return i.k; })); var pi = PG.length - 1; PK.push(key);
@@ -1970,12 +1998,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       X.line(P, ML, 62, PW - ML, 62, 0.6, [0.6, 0.6, 0.6]);
       y = 72;
     }
-    var catKeys = Object.keys(CATN), grupos = [];
-    catKeys.forEach(function (k) {
-      var its = doc.items.filter(function (x) { return x.cat === k; }); if (!its.length) return;
+    var grupos = [];
+    BLQ().forEach(function (B) {
+      var k = B.k, its = doc.items.filter(function (x) { return okK(k, x); }); if (!its.length) return;
       var g = {}, ord = []; its.forEach(function (x) { var kk = (x.tercero || '').toLowerCase(); if (!g[kk]) { g[kk] = { name: x.tercero || '(sin nombre)', items: [] }; ord.push(kk); } g[kk].items.push(x); });
       var lst = ord.map(function (kk) { var t = g[kk]; t.items.sort(function (a, b) { return (b.dias == null ? -9999 : b.dias) - (a.dias == null ? -9999 : a.dias); }); t.total = t.items.reduce(function (s, x) { return s + x.saldo; }, 0); t.nv = t.items.filter(function (x) { return x.dias != null && x.dias > 0; }).length; return t; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'es'); });
-      grupos.push({ k: k, name: CATN[k], lst: lst, total: lst.reduce(function (s, t) { return s + t.total; }, 0), n: its.length });
+      grupos.push({ k: k, cat: B.cat, name: B.nm, lst: lst, total: lst.reduce(function (s, t) { return s + t.total; }, 0), n: its.length });
     });
     // columnas hoja de proveedor
     var C = [{ t: 'N.º', w: 22, a: 'l' }, { t: 'Factura / referencia', w: 118, a: 'l' }, { t: 'Detalle', w: 100, a: 'l' }, { t: 'Fecha factura', w: 62, a: 'l' }, { t: 'Vence', w: 62, a: 'l' }, { t: 'Estado', w: 72, a: 'l' }, { t: 'Valor a pagar', w: 96, a: 'r' }];
@@ -2087,7 +2115,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
         X.text(P, ML + 10, y + 13, 'TOTAL ' + g.name.toUpperCase() + '  ·  ' + g.lst.length + (g.lst.length === 1 ? ' tercero' : ' terceros') + '  ·  ' + g.n + (g.n === 1 ? ' factura' : ' facturas'), { size: 9, bold: 1, color: [1, 1, 1] });
         X.text(P, PW - ML - 10, y + 14, M(g.total), { size: 11, bold: 1, color: [1, 1, 1], align: 'r' });
       }
-      y += 19; prevPers = g.k === 'pers';
+      y += 19; prevPers = g.cat === 'pers';
     });
     // ---- consolidado final (hoja final) ----
     nuevaHoja(false, 'Consolidado final de pagos autorizados', false);
@@ -2120,7 +2148,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       X.rect(P, ML, y, CW, 15, GRIS); X.text(P, ML + 8, y + 10.5, g.name.toUpperCase(), { size: 8.5, bold: 1, color: VERDE });
       X.text(P, PW - ML - 8, y + 10.5, g.lst.length + (g.lst.length === 1 ? ' tercero' : ' terceros') + ' · ' + g.n + (g.n === 1 ? ' factura' : ' facturas'), { size: 7, color: MUT, align: 'r' });
       y += 15; rh2();
-      if (g.compact && g.k === 'pers') fila('Total personal (' + g.lst.length + ' personas)', '', g.n, nvg, g.total, true);
+      if (g.compact && g.cat === 'pers') fila(g.name + ' (' + g.lst.length + ' personas)', '', g.n, nvg, g.total, true);
       else g.lst.forEach(function (t) { fila(t.name, t.p1 === t.p2 ? String(t.p1) : t.p1 + '-' + t.p2, t.items.length, t.nv, t.total, false); });
       X.line(P, ML, y + 1, PW - ML, y + 1, 1, VERDE);
       X.text(P, ML + 8, y + 12, 'Subtotal ' + g.name.toLowerCase(), { size: 8, bold: 1 }); X.text(P, PW - ML - 8, y + 12, M(g.total), { size: 9.5, bold: 1, align: 'r' });
@@ -2295,14 +2323,14 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     h += '\x3cp class="note" style="margin:6px 0">\x3cb>Esta programación contempla\x3c/b> los pagos ya vencidos y los próximos a vencer en el transcurso de la semana en curso.\x3c/p>';
     if (admin) h += '\x3cp class="note no-print" style="margin:6px 0">Si una factura \x3cb>no se pagó\x3c/b>, quítele el chulito. Cuando termine, toque \x3cb>Procesar cambios\x3c/b> abajo: la factura sale de esta programación y el total se recalcula. El Excel no se modifica.\x3c/p>';
     h += '\x3cdiv class="ck-tools no-print" style="margin:6px 0">\x3cspan class="meta">Toque un grupo o un proveedor para abrirlo o recogerlo\x3c/span>\x3cspan>\x3cbutton class="btn" data-ropen="1">Abrir todos\x3c/button> \x3cbutton class="btn" data-ropen="0">Cerrar todos\x3c/button>\x3c/span>\x3c/div>';
-    Object.keys(CATN).forEach(function (k) {
-      var its = doc.items.filter(function (x) { return x.cat === k; }); if (!its.length) return;
+    BLQ().forEach(function (B) {
+      var k = B.k, its = doc.items.filter(function (x) { return okK(k, x); }); if (!its.length) return;
       var g = {}; its.forEach(function (x) { var kk = (x.tercero || '').toLowerCase(); var t = g[kk] || (g[kk] = { name: x.tercero || '(sin nombre)', items: [] }); t.items.push(x); });
       var gl = Object.keys(g).map(function (kk) { var t = g[kk]; t.items.sort(function (p1, q1) { return (q1.dias == null ? -9999 : q1.dias) - (p1.dias == null ? -9999 : p1.dias); }); t.max = t.items[0].dias == null ? -9999 : t.items[0].dias; t.saldo = sm(t.items); return t; }).sort(function (p1, q1) { return (q1.max - p1.max) || (q1.saldo - p1.saldo); });
       var bkey = 'br|' + k, nVc = its.filter(function (x) { return x.dias != null && x.dias > 0; }).length;
       RK.push(bkey);
-      h += '\x3cdetails class="card blk rep-c" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + cb('data-rgc', k, its) + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') +
-        '\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + its.length + (its.length === 1 ? ' pago' : ' pagos') + (nVc ? ' · \x3cspan class="neg">' + nVc + ' vencidas\x3c/span>' : '') + '\x3c/small>\x3c/div>' +
+      h += '\x3cdetails class="card blk rep-c" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + cb('data-rgc', k, its) + ico(icoK(B.cat)) +
+        '\x3cdiv class="card-t">\x3ch3>' + B.nm + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + its.length + (its.length === 1 ? ' pago' : ' pagos') + (nVc ? ' · \x3cspan class="neg">' + nVc + ' vencidas\x3c/span>' : '') + '\x3c/small>\x3c/div>' +
         '\x3cdiv class="blk-t">\x3csmall>Total autorizado\x3c/small>\x3cstrong>' + M(sm(its)) + '\x3c/strong>\x3c/div>\x3cspan class="chev" aria-hidden="true">›\x3c/span>\x3c/summary>\x3cdiv class="parties flat">' +
         gl.map(function (t) {
           var key = 'rp|' + k + '|' + t.name, nv = t.items.filter(function (x) { return x.dias != null && x.dias > 0; }).length; RK.push(key);
@@ -2316,7 +2344,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
               var o = !inc(x);
               return '\x3cdiv class="rp-row' + (admin ? ' ed' : '') + (x.dias != null && x.dias > 0 ? ' venc' : '') + (o ? ' out' : '') + '">' + (admin ? '\x3cinput type="checkbox" class="rck no-print" data-rk="' + esc(x.k) + '"' + (o ? '' : ' checked') + ' aria-label="Pagada / incluida">' : '') + '\x3cdiv class="rp-a">\x3cb>' + esc(refDe(x)) + '\x3c/b>\x3cspan class="meta">' + CATN[x.cat] + (x.sub && x.cat !== 'pers' ? ' · ' + esc(x.sub) : '') + '\x3c/span>\x3cspan class="meta">' + esc(l2) + '\x3c/span>\x3cspan class="rp-chips">' + chipA + ' \x3cspan class="no-print">' + (o ? chip('rojo', 'Se quitará al procesar') : chipE) + '\x3c/span>\x3c/span>\x3c/div>\x3cdiv class="rp-v">' + M(x.saldo) + '\x3c/div>\x3c/div>';
             }).join('') + '\x3c/div>\x3cdiv class="rp-sub">\x3cspan>Subtotal ' + esc(t.name) + '\x3c/span>\x3cb>' + M(t.saldo) + '\x3c/b>\x3c/div>\x3c/details>';
-        }).join('') + '\x3c/div>\x3cdiv class="rp-sub">\x3cspan>Total ' + CATN[k].toLowerCase() + '\x3c/span>\x3cb>' + M(sm(its)) + '\x3c/b>\x3c/div>\x3c/details>';
+        }).join('') + '\x3c/div>\x3cdiv class="rp-sub">\x3cspan>Total ' + B.nm.toLowerCase() + '\x3c/span>\x3cb>' + M(sm(its)) + '\x3c/b>\x3c/div>\x3c/details>';
     });
     S._rk = RK;
     h += '\x3cdiv class="rep-tot">\x3cspan>Total autorizado\x3c/span>\x3cstrong>' + M(totNew) + '\x3c/strong>\x3c/div>';
@@ -2405,14 +2433,14 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       return true;
     });
     var campo = ver === 'sem' ? 'valor' : 'saldo';
-    var bloques = Object.keys(CATN).map(function (k) {
-      var its = ff.filter(function (x) { return x.cat === k; }); if (!its.length) return '';
+    var bloques = BLQ().map(function (B) {
+      var k = B.k, its = ff.filter(function (x) { return okK(k, x); }); if (!its.length) return '';
       var g = {}; its.forEach(function (x) { var kk = x.tercero.toLowerCase(); var t = g[kk] || (g[kk] = { name: x.tercero || '(sin nombre)', items: [], valor: 0, saldo: 0 }); t.items.push(x); t.valor += x.valor; t.saldo += x.saldo; });
       var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return (b[campo] - a[campo]) || (b.valor - a.valor); });
       var tv = suma(its, campo), ts = suma(its, 'saldo');
       var bkey = 'b' + ver + (ver === 'sem' ? L + '.' + (S.gDia || '') : '') + '|' + k;
-      return '\x3cdetails class="card blk" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + ico(k === 'prov' ? 'pagos' : k === 'serv' ? 'imp' : k === 'pers' ? 'res' : 'dist') +
-        '\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + (ver === 'sem' ? (ts > 0.5 ? ' · falta ' + mm(ts) : ' · todo pagado') : ' · ' + nDocs(its.length)) + '\x3c/small>\x3c/div>' +
+      return '\x3cdetails class="card blk" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + ico(icoK(B.cat)) +
+        '\x3cdiv class="card-t">\x3ch3>' + B.nm + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + (ver === 'sem' ? (ts > 0.5 ? ' · falta ' + mm(ts) : ' · todo pagado') : ' · ' + nDocs(its.length)) + '\x3c/small>\x3c/div>' +
         '\x3cdiv class="blk-t">\x3csmall>' + (ver === 'sem' ? 'Total programado' : 'Total sin pagar') + '\x3c/small>\x3cstrong>' + M(tv) + '\x3c/strong>\x3c/div>\x3cspan class="chev" aria-hidden="true">›\x3c/span>\x3c/summary>' +
         '\x3cdiv class="parties flat">' + gl.map(function (t) {
           var key = 'g' + ver + (ver === 'sem' ? L + '.' + (S.gDia || '') : '') + '|' + k + '|' + t.name;
@@ -2714,11 +2742,12 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   function bind() {
     root.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { go(b.dataset.tab); }; });
     root.querySelectorAll('[data-go]').forEach(function (b) { b.onclick = function () { var t = b.dataset.go; if (window.MX_NAV && SOLO[t]) window.MX_NAV(t); else go(t); }; });
-    root.querySelectorAll('[data-seg]').forEach(function (b) { b.onclick = function () { S[b.dataset.seg] = b.dataset.v; if (b.dataset.seg === 'gPlazo') lsSet('mx-plazo', b.dataset.v); if (b.dataset.seg === 'gMod') window.scrollTo(0, 0); render(); }; });
+    root.querySelectorAll('[data-seg]').forEach(function (b) { b.onclick = function () { S[b.dataset.seg] = b.dataset.v; if (b.dataset.seg === 'cat') S.pg = null; if (b.dataset.seg === 'gPlazo') lsSet('mx-plazo', b.dataset.v); if (b.dataset.seg === 'gMod') window.scrollTo(0, 0); render(); }; });
     root.querySelectorAll('[data-est]').forEach(function (b) { b.onclick = function () { S.est = S.est === b.dataset.est ? 'pend' : b.dataset.est; render(); }; });
     root.querySelectorAll('details.blk').forEach(function (d) { d.ontoggle = function () { S.open[d.dataset.bk] = d.open; }; });
     root.querySelectorAll('details.party').forEach(function (d) { d.ontoggle = function () { S.open[d.dataset.k] = d.open; if (d.open && d.querySelector('[data-lazy]')) render(); }; });
-    root.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { var p = b.dataset.tipo.split('|'); S.cat = p[0]; S.est = 'pend'; S.q = !p[1] || p[1] === 'Sin clasificar' ? '' : p[1]; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
+    var pgx = document.getElementById('pg-x'); if (pgx) pgx.onclick = function () { S.pg = null; render(); };
+    root.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { var p = b.dataset.tipo.split('|'); S.cat = p[0]; S.est = 'pend'; S.pg = null; if (p[0] === 'pers') PERS_G.forEach(function (g) { if (g[1] === p[1]) S.pg = g[0]; }); S.q = S.pg || !p[1] || p[1] === 'Sin clasificar' ? '' : p[1]; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
     root.querySelectorAll('[data-emes]').forEach(function (b) { b.onclick = function () { S.eMes = b.dataset.emes === 'all' ? 'all' : +b.dataset.emes; S.ePer = 'all'; S.eDesde = S.eHasta = null; S.eVerTodo = false; window.scrollTo(0, 0); render(); }; });
     root.querySelectorAll('[data-eper]').forEach(function (b) { b.onclick = function () { var v = b.dataset.eper; S.ePer = (v === 'all' || v === 'rango') ? v : (String(S.ePer) === v ? 'all' : +v); if (v === 'rango' && S.eMes !== 'all' && S.eDesde == null) { S.eDesde = mesIni(S.eMes); S.eHasta = mesFin(S.eMes); } S.eVerTodo = false; if (b.classList.contains('row-btn')) window.scrollTo(0, 0); render(); }; });
     root.querySelectorAll('[data-ecat]').forEach(function (b) { b.onclick = function () { S.eCat = b.dataset.ecat; S.q = ''; render(); var d = document.getElementById('detalle'); if (d) d.scrollIntoView(); }; });
@@ -2762,8 +2791,8 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       c.onchange = function () {
         var dc = S.aDocs[iso(S.aWeek)]; if (!dc) return; var O = S.rOut || (S.rOut = {}), on = c.checked, ks = [];
         if (c.dataset.rk) ks = [c.dataset.rk];
-        else if (c.dataset.rgc) ks = dc.items.filter(function (x) { return x.cat === c.dataset.rgc; }).map(function (x) { return x.k; });
-        else if (c.dataset.rgp) { var pp = c.dataset.rgp, i = pp.indexOf('|'), ct = pp.slice(0, i), nm = pp.slice(i + 1); ks = dc.items.filter(function (x) { return x.cat === ct && (x.tercero || '(sin nombre)') === nm; }).map(function (x) { return x.k; }); }
+        else if (c.dataset.rgc) ks = dc.items.filter(function (x) { return okK(c.dataset.rgc, x); }).map(function (x) { return x.k; });
+        else if (c.dataset.rgp) { var pp = c.dataset.rgp, i = pp.indexOf('|'), ct = pp.slice(0, i), nm = pp.slice(i + 1); ks = dc.items.filter(function (x) { return okK(ct, x) && (x.tercero || '(sin nombre)') === nm; }).map(function (x) { return x.k; }); }
         ks.forEach(function (k) { if (on) delete O[k]; else O[k] = 1; }); render();
       };
     });
@@ -3215,8 +3244,8 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     h += '\x3cdiv class="filters">' + seg('cFil', [['all', 'Todos'], ['pend', 'Faltan por pagar'], ['pag', 'Ya pagados']]) + '\x3c/div>';
     var vis = all.filter(function (i) { return fil === 'all' || (fil === 'pend' ? i.est !== 'pagado' : i.est !== 'pend'); });
     if (!vis.length) return h + '\x3cdiv class="panel empty">' + (fil === 'pend' ? 'No falta ningún pago de esta programación.' : 'Todavía no figura pagado ningún pago de esta programación en el Excel cargado.') + '\x3c/div>';
-    ['prov', 'serv', 'pers', 'gast', 'obl', 'ret'].forEach(function (k) {
-      var its = vis.filter(function (i) { return i.it.cat === k; }); if (!its.length) return;
+    BLQ().forEach(function (B) {
+      var k = B.k, its = vis.filter(function (i) { return okK(k, i.it); }); if (!its.length) return;
       var cProg = sum(its, function (i) { return i.prog; }), cPag = sum(its, function (i) { return i.pag; }), cPend = sum(its, function (i) { return i.pend; }), cN = its.filter(function (i) { return !i.nc; }).length;
       var g = {}; its.forEach(function (i) { var kk = (i.it.tercero || '').toLowerCase(); (g[kk] = g[kk] || { name: i.it.tercero || '(sin nombre)', items: [] }).items.push(i); });
       var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
@@ -3224,7 +3253,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       var cRows = fil === 'all' ? [['Total programado', cProg], ['Pagado', cPag, 'ok'], ['Falta por pagar', cPend, cPend < 1 ? 'ok' : 'fa']] : fil === 'pag' ? [['Pagado', cPag, 'ok']] : [['Falta por pagar', cPend, 'fa']];
       var cSub = cN + (cN === 1 ? (fil === 'all' ? ' pago' : ' factura') : (fil === 'all' ? ' pagos' : ' facturas')) + (fil === 'pag' ? ' con pago' : fil === 'pend' ? ' por pagar' : '');
       var bkey = 'cp|' + k + '|' + fil;
-      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s cpsum">\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + cSub + '\x3c/small>\x3c/div>' + kv(cRows) + '\x3c/summary>' +
+      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s cpsum">\x3cdiv class="card-t">\x3ch3>' + B.nm + '\x3c/h3>\x3csmall>' + cSub + '\x3c/small>\x3c/div>' + kv(cRows) + '\x3c/summary>' +
         '\x3cdiv class="ckl">' +
         gl.map(function (t) {
           var tp = sum(t.items, function (i) { return i.prog; }), tg = sum(t.items, function (i) { return i.pag; }), tf = sum(t.items, function (i) { return i.pend; }), tkey = 'cp|' + k + '|' + fil + '|' + t.name, tn = t.items.filter(function (i) { return !i.nc; }).length;
@@ -3261,14 +3290,13 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var sel = items.filter(function (i) { return S.apSel[i.k]; }), neto = sel.reduce(function (s, i) { return s + i.x.saldo; }, 0);
     h += '\x3cp class="note" style="margin:6px 0">Los pagos salen \x3cb>sin marcar\x3c/b>. Marque los que ya se pagaron (o toque \x3cb>Seleccionar todo\x3c/b>) y toque \x3cb>Procesar\x3c/b>. Quedan con fecha de pago \x3cb>' + F(hoy, true) + '\x3c/b>. Los que no marque siguen pendientes para otro día.' + (R.ya ? ' ' + R.ya + ' de esta programación ya figuran pagados en el Excel.' : '') + '\x3c/p>';
     h += '\x3cdiv class="ck-tools" style="margin:6px 0">\x3cspan class="meta">' + items.filter(function (i) { return !i.nc; }).length + ' pagos por aplicar\x3c/span>\x3cspan>\x3cbutton class="btn" id="ap-all">Seleccionar todo\x3c/button> \x3cbutton class="btn" id="ap-none">Quitar selección\x3c/button>\x3c/span>\x3c/div>';
-    var ord = ['prov', 'serv', 'pers', 'gast', 'obl', 'ret'];
-    ord.forEach(function (k) {
-      var its = items.filter(function (i) { return i.x.cat === k; }); if (!its.length) return;
+    BLQ().forEach(function (B) {
+      var k = B.k, its = items.filter(function (i) { return okK(k, i.x); }); if (!its.length) return;
       var g = {}; its.forEach(function (i) { var kk = (i.x.tercero || '').toLowerCase(); (g[kk] = g[kk] || { name: i.x.tercero || '(sin nombre)', items: [] }).items.push(i); });
       var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (p, q) { return p.name.localeCompare(q.name); });
       var nsel = its.filter(function (i) { return S.apSel[i.k]; }).length, bkey = 'ap|' + k, tot = its.reduce(function (s, i) { return s + i.x.saldo; }, 0);
-      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">\x3cdiv class="card-t">\x3ch3>' + CATN[k] + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + (function (n) { return n + (n === 1 ? ' pago' : ' pagos'); })(its.filter(function (i) { return !i.nc; }).length) + (nsel ? ' · \x3cb>' + nsel + ' marcados\x3c/b>' : '') + '\x3c/small>\x3c/div>\x3cdiv class="card-v">\x3csmall>Por aplicar\x3c/small>\x3cb>' + M(tot) + '\x3c/b>\x3c/div>\x3c/summary>' +
-        '\x3cdiv class="ck-tools" style="padding:8px 14px">\x3cspan class="meta">' + CATN[k] + '\x3c/span>\x3cbutton class="btn" data-apcat="' + k + '">' + (nsel && its.filter(function (i) { return !i.nc; }).every(function (i) { return S.apSel[i.k]; }) ? 'Quitar marcas' : 'Marcar todo') + '\x3c/button>\x3c/div>' +
+      h += '\x3cdetails class="card blk" data-bk="' + bkey + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">\x3cdiv class="card-t">\x3ch3>' + B.nm + '\x3c/h3>\x3csmall>' + gl.length + (gl.length === 1 ? ' tercero' : ' terceros') + ' · ' + (function (n) { return n + (n === 1 ? ' pago' : ' pagos'); })(its.filter(function (i) { return !i.nc; }).length) + (nsel ? ' · \x3cb>' + nsel + ' marcados\x3c/b>' : '') + '\x3c/small>\x3c/div>\x3cdiv class="card-v">\x3csmall>Por aplicar\x3c/small>\x3cb>' + M(tot) + '\x3c/b>\x3c/div>\x3c/summary>' +
+        '\x3cdiv class="ck-tools" style="padding:8px 14px">\x3cspan class="meta">' + B.nm + '\x3c/span>\x3cbutton class="btn" data-apcat="' + k + '">' + (nsel && its.filter(function (i) { return !i.nc; }).every(function (i) { return S.apSel[i.k]; }) ? 'Quitar marcas' : 'Marcar todo') + '\x3c/button>\x3c/div>' +
         gl.map(function (t) {
           var base = t.items.filter(function (i) { return !i.ligada; }), rows = [];
           base.forEach(function (i) { rows.push(i); (ncOf[i.k] || []).forEach(function (n) { rows.push(n); }); });
@@ -3419,11 +3447,11 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       c.onclick = function (e) { e.stopPropagation(); };
       c.onchange = function () {
         var p = c.dataset.apq, ix = p.indexOf('|'), ct = p.slice(0, ix), nm = p.slice(ix + 1), on = c.checked;
-        apItems().items.forEach(function (i) { if (i.x.cat === ct && (i.x.tercero || '').toLowerCase() === nm && !i.nc && !i.bloq) { if (on) S.apSel[i.k] = 1; else delete S.apSel[i.k]; } });
+        apItems().items.forEach(function (i) { if (okK(ct, i.x) && (i.x.tercero || '').toLowerCase() === nm && !i.nc && !i.bloq) { if (on) S.apSel[i.k] = 1; else delete S.apSel[i.k]; } });
         render();
       };
     });
-    root.querySelectorAll('[data-apcat]').forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); var its = apItems().items.filter(function (i) { return i.x.cat === b.dataset.apcat && !i.nc && !i.bloq; }), all = its.every(function (i) { return S.apSel[i.k]; }); its.forEach(function (i) { if (all) delete S.apSel[i.k]; else S.apSel[i.k] = 1; }); render(); }; });
+    root.querySelectorAll('[data-apcat]').forEach(function (b) { b.onclick = function (ev) { ev.preventDefault(); var its = apItems().items.filter(function (i) { return okK(b.dataset.apcat, i.x) && !i.nc && !i.bloq; }), all = its.every(function (i) { return S.apSel[i.k]; }); its.forEach(function (i) { if (all) delete S.apSel[i.k]; else S.apSel[i.k] = 1; }); render(); }; });
   }
 
   /* ---------- Cargar Excel ---------- */

@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 9.5
+  Flujo de Caja La Matriarca — versión 9.6
 
   HISTORIAL DE VERSIONES
+  v9.6 (3 nov 2026) — Corregido el PDF «Pagos autorizados»: en la hoja final, «Rango de vencimiento» y «Facturas autorizadas» se escribían uno encima del otro.
   v9.5 (26 oct 2026) — Impuestos como proyección, con botón «Aplicar impuestos al flujo de caja».
     · En Disponible real y en Resumen, los impuestos se muestran como «Proyección de impuestos a la fecha» y NO se descuentan.
     · El disponible real sale sin impuestos y dice cuánto quedaría si se aplican. Al tocar «Aplicar impuestos al flujo de caja» se descuentan; el botón cambia a «Quitar impuestos del disponible».
@@ -472,7 +473,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "9.5";
+window.MX_VERSION = "9.6";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -2133,9 +2134,9 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var totV = grupos.reduce(function (s2, g) { return s2 + g.lst.reduce(function (s3, t) { return s3 + t.nv; }, 0); }, 0);
     // datos de la autorización
     var info = [['Programación', doc.codigo || '-'], ['Periodo', semTxt.replace('Semana ', 'Semana del ')], ['Autorizó', doc.por || '-'], ['Guardado', stampLargo(doc.guardadoISO)], ['Pagos para el', doc.fechaPago ? fnum(doc.fechaPago) : 'Sin fecha definida'], ['Datos del Excel', doc.fechaInforme ? 'Informe del ' + fnum(doc.fechaInforme) : '-'], ['Facturas autorizadas', doc.n + (totV ? '  (' + totV + ' vencidas)' : '')]];
-    var rgT = rangoDoc(doc), bH = rgT ? 67 : 46;
+    var rgT = rangoDoc(doc), bH = rgT ? 88 : 67;
     X.rect(P, ML, y, CW, bH, [0.95, 0.96, 0.95]); X.rect(P, ML, y, 3, bH, VERDE);
-    if (rgT) { X.text(P, ML + 12, y + 53, 'RANGO DE VENCIMIENTO', { size: 6.5, bold: 1, color: MUT }); X.text(P, ML + 12, y + 61.5, rgT, { size: 8, bold: 1 }); }
+    if (rgT) { X.text(P, ML + 12, y + 74, 'RANGO DE VENCIMIENTO', { size: 6.5, bold: 1, color: MUT }); X.text(P, ML + 12, y + 82.5, rgT, { size: 8, bold: 1 }); }
     info.forEach(function (f, i) { var cxx = ML + 12 + (i % 3) * 172, cyy = y + 11 + Math.floor(i / 3) * 21; X.text(P, cxx, cyy, f[0].toUpperCase(), { size: 6.5, bold: 1, color: MUT }); X.text(P, cxx, cyy + 8.5, f[1], { size: 8, bold: 1 }); });
     y += bH + 6;
     var RS2 = [{ t: 'Proveedor / tercero', w: 236, a: 'l' }, { t: 'Paquete', w: 54, a: 'r' }, { t: 'Facturas', w: 56, a: 'r' }, { t: 'Vencidas', w: 56, a: 'r' }, { t: 'Total a pagar', w: 130, a: 'r' }], r2x = [], x2 = ML;

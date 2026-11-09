@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 9.8
+  Flujo de Caja La Matriarca — versión 9.9
 
   HISTORIAL DE VERSIONES
+  v9.9 (9 nov 2026) — La app se actualiza sola: al abrirla revisa si hay una versión nueva y recarga (arregla el acceso directo del celular que quedaba en la versión vieja).
   v9.8 (9 nov 2026) — Reportes en orden alfabético (A–Z) por proveedor / persona: texto para compartir, reporte de pagos autorizados, Programación,
     Por pagar y lista de proveedores del Programado vs pagado. (El PDF ya salía A–Z.)
   v9.7 (6 nov 2026) — Ventas e ingresos: nueva opción «Mi rango». Se elige fecha Desde y Hasta (calendario) y se ve el consolidado de ese rango,
@@ -477,7 +478,22 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "9.8";
+window.MX_VERSION = "9.9";
+/* v9.9 Autoactualización: al abrir, mira si hay una versión más nueva publicada y, si la hay, recarga sola (útil para el acceso directo del celular) */
+(function () {
+  try {
+    if (!window.fetch || location.protocol === 'file:') return;
+    var cur = window.MX_VERSION;
+    fetch(location.pathname + '?chk=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (t) {
+      var m = /window\.MX_VERSION = "([^"]+)"/.exec(t);
+      if (!m || m[1] === cur) return;
+      var k = 'mx-upd', prev = null; try { prev = sessionStorage.getItem(k); } catch (e) {}
+      if (prev === m[1]) return;   // evita recargar en bucle
+      try { sessionStorage.setItem(k, m[1]); } catch (e) {}
+      location.replace(location.pathname + '?v=' + m[1].replace(/\./g, '') + '&r=' + Date.now());
+    }).catch(function () {});
+  } catch (e) {}
+})();
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}

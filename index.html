@@ -1,8 +1,10 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 9.7
+  Flujo de Caja La Matriarca — versión 9.8
 
   HISTORIAL DE VERSIONES
+  v9.8 (9 nov 2026) — Reportes en orden alfabético (A–Z) por proveedor / persona: texto para compartir, reporte de pagos autorizados, Programación,
+    Por pagar y lista de proveedores del Programado vs pagado. (El PDF ya salía A–Z.)
   v9.7 (6 nov 2026) — Ventas e ingresos: nueva opción «Mi rango». Se elige fecha Desde y Hasta (calendario) y se ve el consolidado de ese rango,
     por punto o por ambos, por día o por semana. Atajos: Esta semana, Semana pasada, Este mes, Mes anterior.
   v9.6 (3 nov 2026) — Corregido el PDF «Pagos autorizados»: en la hoja final, «Rango de vencimiento» y «Facturas autorizadas» se escribían uno encima del otro.
@@ -475,7 +477,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "9.7";
+window.MX_VERSION = "9.8";
 </script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap">
 <style>body{margin:0}[hidden]{display:none!important}
@@ -1540,6 +1542,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   }
   function icoK(c) { return c === 'prov' ? 'pagos' : c === 'serv' ? 'imp' : c === 'pers' ? 'res' : 'dist'; }
   function estado(p, D) { if (!p.fProg) return 'sin'; if (p.fProg < D) return 'venc'; if (p.fProg === D) return 'hoy'; return 'fut'; }
+  function azN(a, b) { return String(a || '').localeCompare(String(b || ''), 'es', { sensitivity: 'base' }); }   // v9.8: orden alfabético
   function vPagar(R) {
     var D = S.D;
     var rows = W.pay.filter(function (p) { return p.saldo !== 0; });
@@ -1579,7 +1582,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     });
     var g = {};
     f.forEach(function (p) { var k = p.cat + '|' + p.tercero.toLowerCase(); (g[k] = g[k] || { cat: p.cat, name: p.tercero || '(sin nombre)', items: [], saldo: 0 }).items.push(p); g[k].saldo += p.saldo; });
-    var list = Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return b.saldo - a.saldo; });
+    var list = Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return azN(a.name, b.name); });
     h += '\x3cdiv class="meta">' + list.length + ' terceros · ' + f.length + ' documentos · ' + M(f.reduce(function (s, p) { return s + p.saldo; }, 0)) + '\x3c/div>';
     if (!list.length) h += '\x3cdiv class="parties">\x3cdiv class="empty">No hay pagos pendientes con estos filtros.\x3c/div>\x3c/div>';
     else h += '\x3cdiv class="parties">' + list.map(function (t) {
@@ -1832,7 +1835,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       var k = B.k, its = doc.items.filter(function (x) { return okK(k, x); }); if (!its.length) return;
       L.push('== ' + B.nm.toUpperCase() + ' ==');
       var g = {}, ord = []; its.forEach(function (x) { var kk = (x.tercero || '').toLowerCase(); if (!g[kk]) { g[kk] = { name: x.tercero || '(sin nombre)', items: [] }; ord.push(kk); } g[kk].items.push(x); });
-      ord.forEach(function (kk) { var t = g[kk];
+      ord.sort(function (a, b) { return azN(g[a].name, g[b].name); }).forEach(function (kk) { var t = g[kk];
         L.push(t.name + ' — ' + M(t.items.reduce(function (s2, x) { return s2 + x.saldo; }, 0)));
         t.items.forEach(function (x) { L.push('   · ' + refDe(x) + (x.venc != null ? ' · vence ' + F(x.venc) : '') + (x.dias != null && x.dias > 0 ? ' · VENCIDA ' + x.dias + ' d' : '') + ' · ' + M(x.saldo)); });
       });
@@ -2352,7 +2355,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     BLQ().forEach(function (B) {
       var k = B.k, its = doc.items.filter(function (x) { return okK(k, x); }); if (!its.length) return;
       var g = {}; its.forEach(function (x) { var kk = (x.tercero || '').toLowerCase(); var t = g[kk] || (g[kk] = { name: x.tercero || '(sin nombre)', items: [] }); t.items.push(x); });
-      var gl = Object.keys(g).map(function (kk) { var t = g[kk]; t.items.sort(function (p1, q1) { return (q1.dias == null ? -9999 : q1.dias) - (p1.dias == null ? -9999 : p1.dias); }); t.max = t.items[0].dias == null ? -9999 : t.items[0].dias; t.saldo = sm(t.items); return t; }).sort(function (p1, q1) { return (q1.max - p1.max) || (q1.saldo - p1.saldo); });
+      var gl = Object.keys(g).map(function (kk) { var t = g[kk]; t.items.sort(function (p1, q1) { return (q1.dias == null ? -9999 : q1.dias) - (p1.dias == null ? -9999 : p1.dias); }); t.max = t.items[0].dias == null ? -9999 : t.items[0].dias; t.saldo = sm(t.items); return t; }).sort(function (p1, q1) { return azN(p1.name, q1.name); });
       var bkey = 'br|' + k, nVc = its.filter(function (x) { return x.dias != null && x.dias > 0; }).length;
       RK.push(bkey);
       h += '\x3cdetails class="card blk rep-c" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + cb('data-rgc', k, its) + ico(icoK(B.cat)) +
@@ -2462,7 +2465,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var bloques = BLQ().map(function (B) {
       var k = B.k, its = ff.filter(function (x) { return okK(k, x); }); if (!its.length) return '';
       var g = {}; its.forEach(function (x) { var kk = x.tercero.toLowerCase(); var t = g[kk] || (g[kk] = { name: x.tercero || '(sin nombre)', items: [], valor: 0, saldo: 0 }); t.items.push(x); t.valor += x.valor; t.saldo += x.saldo; });
-      var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return (b[campo] - a[campo]) || (b.valor - a.valor); });
+      var gl = Object.keys(g).map(function (kk) { return g[kk]; }).sort(function (a, b) { return azN(a.name, b.name); });
       var tv = suma(its, campo), ts = suma(its, 'saldo');
       var bkey = 'b' + ver + (ver === 'sem' ? L + '.' + (S.gDia || '') : '') + '|' + k;
       return '\x3cdetails class="card blk" data-bk="' + esc(bkey) + '"' + (S.open[bkey] ? ' open' : '') + '>\x3csummary class="blk-s">' + ico(icoK(B.cat)) +
@@ -2948,7 +2951,7 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
       cats.push({ k: k, name: CATN[k], n: its.filter(function (i) { return !i.nc; }).length, prog: sum(its, function (i) { return i.prog; }), pag: sum(its, function (i) { return i.pag; }), pend: sum(its, function (i) { return i.pend; }) });
     });
     var g = {}; all.filter(function (i) { return i.it.cat === 'prov' || i.it.cat === 'serv'; }).forEach(function (i) { var kk = (i.it.tercero || '').toLowerCase(); var t = g[kk] || (g[kk] = { name: i.it.tercero || '(sin nombre)', pend: 0, n: 0 }); t.pend += i.pend; if (!i.nc && i.est !== 'pagado') t.n++; });
-    var terc = Object.keys(g).map(function (kk) { return g[kk]; }).filter(function (t) { return t.pend >= 1; }).sort(function (a, b) { return b.pend - a.pend; });
+    var terc = Object.keys(g).map(function (kk) { return g[kk]; }).filter(function (t) { return t.pend >= 1; }).sort(function (a, b) { return azN(a.name, b.name); });
     return {
       sem: F(doc.lunes) + ' – ' + F(doc.lunes + 6) + ' ' + MX.toJS(doc.lunes).getUTCFullYear(), lunes: iso(doc.lunes),
       prog: sum(all, function (i) { return i.prog; }), pag: sum(all, function (i) { return i.pag; }), pend: sum(all, function (i) { return i.pend; }),

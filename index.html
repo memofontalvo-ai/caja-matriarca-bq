@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 9.9
+  Flujo de Caja La Matriarca — versión 10.0
 
   HISTORIAL DE VERSIONES
+  v10.0 (17 nov 2026) — Corregido «El Excel es demasiado grande para guardarlo»: los datos ahora se guardan en varios pedazos, sin tope de tamaño.
   v9.9 (9 nov 2026) — La app se actualiza sola: al abrirla revisa si hay una versión nueva y recarga (arregla el acceso directo del celular que quedaba en la versión vieja).
   v9.8 (9 nov 2026) — Reportes en orden alfabético (A–Z) por proveedor / persona: texto para compartir, reporte de pagos autorizados, Programación,
     Por pagar y lista de proveedores del Programado vs pagado. (El PDF ya salía A–Z.)
@@ -478,7 +479,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "9.9";
+window.MX_VERSION = "10.0";
 /* v9.9 Autoactualización: al abrir, mira si hay una versión más nueva publicada y, si la hay, recarga sola (útil para el acceso directo del celular) */
 (function () {
   try {
@@ -4260,13 +4261,14 @@ if (typeof module !== 'undefined') module.exports = MX;
     var quienSube = perfil && perfil.nombre ? perfil.nombre : (auth.currentUser ? auth.currentUser.email : '');
     W.cargado = new Date().toISOString(); W.cargadoPor = quienSube; if (archivo) W.archivoNombre = archivo;
     var json = JSON.stringify(W);
-    if (json.length > 900000) return Promise.reject({ message: 'El Excel es demasiado grande para guardarlo en un solo registro (' + Math.round(json.length / 1024) + ' KB).' });
+    var PCH = 250000, partes = json.length > 400000 ? Math.ceil(json.length / PCH) : 0;   // v10.0: si es grande, se guarda en varios pedazos (un registro de Firebase admite ~1 MB)
     var u = auth.currentUser, now = new Date();
-    var rec = { json: json, archivo: archivo || '', por: perfil && perfil.usuario ? perfil.usuario : (u ? u.email : ''), fechaInforme: W.fechaInforme || null, guardado: firebase.firestore.FieldValue.serverTimestamp() };
+    var rec = { json: partes ? '' : json, partes: partes, archivo: archivo || '', por: perfil && perfil.usuario ? perfil.usuario : (u ? u.email : ''), fechaInforme: W.fechaInforme || null, guardado: firebase.firestore.FieldValue.serverTimestamp() };
     var id = now.toISOString().slice(0, 16).replace(/[:T]/g, '-');
     var batch = db.batch();
     batch.set(REF, rec);
-    batch.set(db.collection('historial').doc(id), rec);
+    for (var pk = 0; pk < partes; pk++) batch.set(db.collection('tesoreria').doc('actual_' + pk), { k: pk, d: json.slice(pk * PCH, (pk + 1) * PCH) });
+    batch.set(db.collection('historial').doc(id), partes ? Object.assign({}, rec, { sinCopia: true }) : rec);
     var bytes = bufNuevo || (window.MX_LASTXLS && window.MX_LASTXLS.name === archivo ? window.MX_LASTXLS.buf : null), cargado = W.cargado;
     return batch.commit().then(function () {
       if (!bytes) return null;
@@ -4373,8 +4375,18 @@ if (typeof module !== 'undefined') module.exports = MX;
   function cargarDatos() {
     show('\x3cp class="g-msg">Cargando datos…\x3c/p>');
     REF.get().then(function (snap) {
-      if (snap.exists && snap.data().json) boot(JSON.parse(snap.data().json));
-      else primerExcel();
+      var d = snap.exists ? snap.data() : null;
+      if (d && d.json) return boot(JSON.parse(d.json));
+      if (d && d.partes) {
+        var ps = [], pk;
+        for (pk = 0; pk < d.partes; pk++) ps.push(db.collection('tesoreria').doc('actual_' + pk).get());
+        return Promise.all(ps).then(function (a) {
+          var txt = '', i;
+          for (i = 0; i < a.length; i++) { if (!a[i].exists) throw new Error('Faltan pedazos de los datos guardados. Vuelva a cargar el Excel.'); txt += a[i].data().d; }
+          boot(JSON.parse(txt));
+        });
+      }
+      primerExcel();
     }).catch(function (er) {
       show('\x3cp class="g-err">' + (er.code === 'permission-denied' ? 'Su usuario no tiene permiso para ver estos datos. Pida al administrador que lo active.' : 'No se pudieron cargar los datos: ' + esc(er.message || er.code)) + '\x3c/p>\x3cbutton class="g-link" type="button" id="g-home">‹ Volver al menú\x3c/button>' + salir()); $('g-home').onclick = function () { ir('menu'); };
       bindSalir();

@@ -1,8 +1,12 @@
 <!doctype html>
 <!--
-  Flujo de Caja La Matriarca — versión 10.0
+  Flujo de Caja La Matriarca — versión 10.3
 
   HISTORIAL DE VERSIONES
+  v10.3 (18 nov 2026) — Se quita la lectura automática de columnas de PROVEEDORES (la tabla del Excel ya fue corregida por contabilidad): Proveedores se lee como siempre.
+  v10.2 (18 nov 2026) — Ventas: «Venta con impuestos y propina» y «Venta sin impuestos y propina» por punto y total de ambos negocios. Nuevo informe «Comparar con mes anterior»:
+    lo que llevo del mes en curso contra los mismos días del mes anterior, con diferencia y porcentaje, por punto y ambos.
+  v10.1 (17 nov 2026) — (sin cambios en Proveedores; ver v10.3)
   v10.0 (17 nov 2026) — Corregido «El Excel es demasiado grande para guardarlo»: los datos ahora se guardan en varios pedazos, sin tope de tamaño.
   v9.9 (9 nov 2026) — La app se actualiza sola: al abrirla revisa si hay una versión nueva y recarga (arregla el acceso directo del celular que quedaba en la versión vieja).
   v9.8 (9 nov 2026) — Reportes en orden alfabético (A–Z) por proveedor / persona: texto para compartir, reporte de pagos autorizados, Programación,
@@ -479,7 +483,7 @@ window.FIREBASE_CONFIG = {
   messagingSenderId: "119376552576",
   appId: "1:119376552576:web:faf4f49428dc3a2b5cfc65"
 };
-window.MX_VERSION = "10.0";
+window.MX_VERSION = "10.3";
 /* v9.9 Autoactualización: al abrir, mira si hay una versión más nueva publicada y, si la hay, recarga sola (útil para el acceso directo del celular) */
 (function () {
   try {
@@ -745,6 +749,19 @@ tr.row-link.on td{background:var(--accent-soft);font-weight:600}
 .row-2 small{display:block;font-size:12.5px;font-weight:400;color:var(--muted);margin-top:1px}
 .row-2>span:first-child{color:var(--ink);font-weight:600}
 
+.cmp-hero{border-radius:16px;padding:16px;margin:0 0 14px;background:#e4f0e7;border:1px solid #c9dfce}
+.cmp-hero.dn{background:#fbe8e5;border-color:#efc9c3}
+.cmp-hero-t{font-size:17px;font-weight:600;line-height:1.3}.cmp-hero-t b{font-size:22px}
+.cmp-hero-s{font-size:13px;color:var(--muted);margin:2px 0 10px}
+.cmp-hero-g{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cmp-hero-g em{display:block;font-style:normal;font-size:12px;color:var(--muted);text-transform:capitalize}
+.cmp-hero-g b{font-size:18px}
+.cmp-hero-f{margin-top:10px;font-size:14px;padding-top:10px;border-top:1px solid rgba(0,0,0,.1)}
+.cmp-r{padding:10px 0;border-bottom:1px dashed var(--line)}.cmp-r:last-child{border-bottom:0}
+.cmp-l{font-size:13px;color:var(--muted);margin-bottom:4px}
+.cmp-v{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-weight:700;font-size:15px}
+.cmp-v em{display:block;font-style:normal;font-weight:500;font-size:11px;color:var(--muted)}
+.cmp-d{margin-top:4px;font-size:13px;font-weight:700;color:var(--muted)}.cmp-d.up{color:#1f7a44}.cmp-d.dn{color:#b3382c}
 .rngbox{background:var(--surface);border:1px solid var(--line,#dde3de);border-radius:16px;padding:12px 14px;margin:0 0 12px;display:grid;gap:10px}
 .rngbox-t{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
 .rngbox-d{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -1405,8 +1422,67 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
   function line(cls, lbl, v, go) { return '\x3cdiv class="l ' + cls + '">\x3cspan>' + (go ? '\x3cbutton class="linkbtn" data-go="' + go + '">' + esc(lbl) + '\x3c/button>' : esc(lbl)) + '\x3c/span>' + amt(v) + '\x3c/div>'; }
   function tile(k, v, n) { return '\x3cdiv class="tile">\x3cspan class="k">' + esc(k) + '\x3c/span>\x3cspan class="v' + (v < 0 ? ' neg' : '') + '">' + M(v) + '\x3c/span>\x3cspan class="n">' + esc(n) + '\x3c/span>\x3c/div>'; }
 
+
+  /* ---------- v10.2 COMPARATIVO: mes en curso vs mismo período del mes anterior ---------- */
+  function vtRes(desde, hasta, est) {
+    var V = MX.ventas(W, desde, hasta), z = function () { return { con: 0, ico: 0, icoE: 0, prop: 0, sin: 0, n: 0 }; };
+    var o = { c80: z(), mp: z(), t: z(), last: null };
+    V.dias.forEach(function (d) {
+      if (!(d.total || d.ico)) return;
+      if (o.last == null || d.f > o.last) o.last = d.f;
+      [['c80', d.c80, d.icoC80, d.propC80], ['mp', d.mp, d.icoMP, d.propMP]].forEach(function (q) {
+        var k = o[q[0]], ie = (!d.icoReg && est) ? q[1] * 0.08 / 1.08 : 0;
+        k.con += q[1]; k.ico += q[2]; k.icoE += ie; k.prop += q[3]; k.sin += q[1] - q[2] - ie - q[3]; if (q[1]) k.n++;
+      });
+    });
+    ['con', 'ico', 'icoE', 'prop', 'sin'].forEach(function (k) { o.t[k] = o.c80[k] + o.mp[k]; });
+    var fs = {}; V.dias.forEach(function (d) { if (d.total) fs[d.f] = 1; }); o.t.n = Object.keys(fs).length;
+    return o;
+  }
+  function vVentasCmp() {
+    var est = S.vIco === 'est', base = S.D, js = MX.toJS(base), y = js.getUTCFullYear(), m = js.getUTCMonth();
+    var MES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    var ini = MX.fromJS(new Date(Date.UTC(y, m, 1)));
+    var act0 = vtRes(ini, base, est), hasta = act0.last != null ? act0.last : base;
+    var dia = MX.toJS(hasta).getUTCDate(), act = vtRes(ini, hasta, est);
+    var pm = m === 0 ? 11 : m - 1, py = m === 0 ? y - 1 : y, pLen = new Date(Date.UTC(py, pm + 1, 0)).getUTCDate();
+    var pIni = MX.fromJS(new Date(Date.UTC(py, pm, 1))), pHasta = MX.fromJS(new Date(Date.UTC(py, pm, Math.min(dia, pLen))));
+    var ant = vtRes(pIni, pHasta, est), antFull = vtRes(pIni, MX.fromJS(new Date(Date.UTC(py, pm, pLen))), est);
+    var nA = MES[m], nP = MES[pm], lblA = '1–' + dia + ' ' + nA.slice(0, 3), lblP = '1–' + Math.min(dia, pLen) + ' ' + nP.slice(0, 3);
+    function pc(p) { return (p > 0 ? '+' : '') + p.toFixed(1).replace('.', ',') + '%'; }
+    function sg(v) { return (v > 0.5 ? '+' : '') + M(v); }
+    function fila(lbl, cur, prev, esNum) {
+      var dif = cur - prev, p = prev ? dif / prev * 100 : null, cls = dif > 0.5 ? 'up' : dif < -0.5 ? 'dn' : '';
+      var f = esNum ? function (v) { return String(Math.round(v)); } : M;
+      return '\x3cdiv class="cmp-r">\x3cdiv class="cmp-l">' + lbl + '\x3c/div>\x3cdiv class="cmp-v">\x3cspan>\x3cem>' + lblP + '\x3c/em>' + f(prev) + '\x3c/span>\x3cspan>\x3cem>' + lblA + '\x3c/em>' + f(cur) + '\x3c/span>\x3c/div>' +
+        '\x3cdiv class="cmp-d ' + cls + '">' + (dif > 0.5 ? '▲ ' : dif < -0.5 ? '▼ ' : '') + (p == null ? 'sin base de comparación' : pc(p)) + (esNum ? ' · ' + (dif > 0 ? '+' : '') + Math.round(dif) : ' · ' + sg(dif)) + '\x3c/div>\x3c/div>';
+    }
+    function bloque(titulo, k, sub) {
+      var a = act[k], b = ant[k];
+      return '\x3carticle class="card cmp">\x3cheader class="card-h">' + ico('ing') + '\x3cdiv class="card-t">\x3ch3>' + titulo + '\x3c/h3>\x3csmall>' + sub + '\x3c/small>\x3c/div>\x3c/header>\x3cdiv class="card-b">' +
+        fila('Venta con impuestos y propina', a.con, b.con) + fila('Venta sin impuestos y propina', a.sin, b.sin) + fila('Impoconsumo (ICO)', a.ico + a.icoE, b.ico + b.icoE) + fila('Propina', a.prop, b.prop) +
+        fila('Promedio por día (con impuestos y propina)', a.n ? a.con / a.n : 0, b.n ? b.con / b.n : 0) + fila('Días con venta', a.n, b.n, true) + '\x3c/div>\x3c/article>';
+    }
+    var h = '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Ventas e ingresos\x3c/h2>\x3cspan class="meta">Comparativo del mes · ' + lblA + ' ' + y + ' contra ' + lblP + ' ' + py + '\x3c/span>\x3c/div>\x3c/div>';
+    h += '\x3cdiv class="filters">' + seg('vRango', [['sem', 'Semana (lun–dom)'], ['4s', '4 semanas'], ['todo', 'Desde el inicio'], ['rng', 'Mi rango'], ['cmp', 'Comparar con mes anterior']]) + seg('vIco', [['reg', 'ICO registrado'], ['est', 'Estimar ICO faltante']]) + '\x3c/div>';
+    if (act0.last == null) return h + '\x3cdiv class="alert info">\x3cspan class="ic" aria-hidden="true">i\x3c/span>\x3cb>Todavía no hay ventas cargadas en ' + nA + '.\x3c/b>\x3c/div>';
+    var dif = act.t.con - ant.t.con, p = ant.t.con ? dif / ant.t.con * 100 : null, falta = antFull.t.con - act.t.con;
+    h += '\x3csection class="cmp-hero ' + (dif >= 0 ? 'up' : 'dn') + '">\x3cdiv class="cmp-hero-t">Llevo ' + (p == null ? '' : '\x3cb>' + Math.abs(p).toFixed(1).replace('.', ',') + '%\x3c/b> ') + (dif >= 0 ? 'por encima' : 'por debajo') + ' del mismo período del mes anterior\x3c/div>' +
+      '\x3cdiv class="cmp-hero-s">Ambos puntos · venta con impuestos y propina\x3c/div>' +
+      '\x3cdiv class="cmp-hero-g">\x3cdiv>\x3cem>' + nA.charAt(0).toUpperCase() + nA.slice(1) + ' (' + lblA + ')\x3c/em>\x3cb>' + M(act.t.con) + '\x3c/b>\x3c/div>\x3cdiv>\x3cem>' + nP.charAt(0).toUpperCase() + nP.slice(1) + ' (' + lblP + ')\x3c/em>\x3cb>' + M(ant.t.con) + '\x3c/b>\x3c/div>\x3c/div>' +
+      '\x3cdiv class="cmp-hero-f">' + (falta > 0.5 ? 'Para igualar todo ' + nP + ' (' + M(antFull.t.con) + ') me faltan \x3cb>' + M(falta) + '\x3c/b>' : 'Ya superé todo lo que se vendió en ' + nP + ' (' + M(antFull.t.con) + ')') + '\x3c/div>\x3c/section>';
+    var av = [];
+    if (W.inicio && pIni < W.inicio) av.push('El Excel empieza el control el ' + F(W.inicio) + ': el mes anterior puede estar incompleto y la comparación no ser exacta.');
+    if (hasta < base) av.push('La última venta cargada es del ' + F(hasta) + '; se comparan los mismos días (1 al ' + dia + ') de cada mes.');
+    if (est) av.push('El ICO de los días sin registro se estimó al 8% incluido en la venta.');
+    if (av.length) h += '\x3cdiv class="alert info">\x3cspan class="ic" aria-hidden="true">i\x3c/span>\x3cb>Sobre esta comparación\x3c/b>\x3cul class="av">' + av.map(function (t) { return '\x3cli>' + t + '\x3c/li>'; }).join('') + '\x3c/ul>\x3c/div>';
+    h += '\x3csection class="cards3">' + bloque('Ambos puntos', 't', 'Calle 80 + Mall Plaza') + bloque('Calle 80', 'c80', lblP + ' → ' + lblA) + bloque('Mall Plaza', 'mp', lblP + ' → ' + lblA) + '\x3c/section>';
+    return h;
+  }
+
   /* ---------- VENTAS ---------- */
   function vVentas() {
+    if (S.vRango === 'cmp') return vVentasCmp();
     var D0 = S.D; if (S.vWD !== D0 || S.vW == null) { S.vW = MX.lunesDe(D0); S.vWD = D0; }
     var vL = S.vW, D = vL + 6, desde = S.vRango === 'todo' ? W.inicio : S.vRango === '4s' ? vL - 21 : vL;
     var esRng = S.vRango === 'rng';
@@ -1431,20 +1507,26 @@ input.dt{border:1px solid var(--line);border-radius:10px;padding:7px 10px;backgr
     var h = (esRng ? '\x3cdiv class="rngbox">\x3cb class="rngbox-t">Mi rango de fechas\x3c/b>\x3cdiv class="rngbox-d">\x3clabel for="v-desde">Desde\x3cinput type="date" class="dt" id="v-desde" value="' + iso(desde) + '">\x3c/label>\x3clabel for="v-hasta">Hasta\x3cinput type="date" class="dt" id="v-hasta" value="' + iso(D) + '">\x3c/label>\x3c/div>' +
       '\x3cdiv class="rngbox-q">\x3cbutton class="btn" data-vq="sem">Esta semana\x3c/button>\x3cbutton class="btn" data-vq="spas">Semana pasada\x3c/button>\x3cbutton class="btn" data-vq="mes">Este mes\x3c/button>\x3cbutton class="btn" data-vq="mant">Mes anterior\x3c/button>\x3c/div>\x3c/div>' : '\x3cdiv class="weeknav">\x3cbutton class="btn" id="v-prev" aria-label="Semana anterior">‹ Anterior\x3c/button>\x3cdiv class="weeknav-t">\x3csmall>' + (vL === MX.lunesDe(D0) ? 'Semana de la fecha elegida' : 'Semana') + '\x3c/small>\x3cb>Lun ' + F(vL) + ' – dom ' + F(vL + 6) + '\x3c/b>\x3c/div>\x3cbutton class="btn" id="v-next" aria-label="Semana siguiente">Siguiente ›\x3c/button>\x3c/div>') + '\x3cdiv class="page-h">\x3cdiv>\x3ch2>Ventas e ingresos\x3c/h2>\x3cspan class="meta">' + ptNom + ' · ' + (dias.length ? 'del ' + F(dias[0].d.f) + ' al ' + F(dias[dias.length - 1].d.f) + ' · ' + dias.length + ' días con venta' : 'sin ventas en el período') + '\x3c/span>\x3c/div>\x3c/div>';
     h += '\x3cdiv class="filters">' + seg('vPunto', [['all', 'Ambos puntos'], ['c80', 'Calle 80'], ['mp', 'Mall Plaza']]) + seg('vVista', [['dia', 'Por día'], ['semana', 'Por semana']]) +
-      seg('vRango', [['sem', 'Semana (lun–dom)'], ['4s', '4 semanas'], ['todo', 'Desde el inicio'], ['rng', 'Mi rango']]) + seg('vIco', [['reg', 'ICO registrado'], ['est', 'Estimar ICO faltante']]) + '\x3c/div>';
+      seg('vRango', [['sem', 'Semana (lun–dom)'], ['4s', '4 semanas'], ['todo', 'Desde el inicio'], ['rng', 'Mi rango'], ['cmp', 'Comparar con mes anterior']]) + seg('vIco', [['reg', 'ICO registrado'], ['est', 'Estimar ICO faltante']]) + '\x3c/div>';
     // Tarjetas
     var icoT = T.ico + T.icoEst;
+    // v10.2: venta con impuestos y propina / sin impuestos y propina, por punto y total
+    var rp = { c80: { con: 0, sin: 0 }, mp: { con: 0, sin: 0 } };
+    V.dias.forEach(function (d) { if (!(d.total || d.ico)) return;
+      [['c80', d.c80, d.icoC80, d.propC80], ['mp', d.mp, d.icoMP, d.propMP]].forEach(function (q) { var ie = (!d.icoReg && est) ? q[1] * 0.08 / 1.08 : 0; rp[q[0]].con += q[1]; rp[q[0]].sin += q[1] - q[2] - ie - q[3]; }); });
+    function filasPunto(k) { return (pt === 'all' ? row('Calle 80', rp.c80[k]) + row('Mall Plaza', rp.mp[k]) : row(ptNom, rp[pt][k])); }
+    var totLbl = pt === 'all' ? 'Total ambos negocios' : 'Total ' + ptNom;
     h += '\x3csection class="cards3">' +
-      card({ icon: 'ing', title: 'Venta total', sub: W.formatoIngresos === 'ventas' ? 'Total venta de cada cierre (incluye ICO y propina)' : 'Lo que se registró en los cierres de caja',
-        body: (pt === 'all' ? row('Calle 80', T.c80) + row('Mall Plaza', T.mp) : row(ptNom, T.venta)) + row('Promedio por día', dias.length ? T.venta / dias.length : 0, 'sub'),
-        totalLbl: 'Venta total', total: T.venta, tone: 'pos' }) +
+      card({ icon: 'ing', title: 'Venta con impuestos y propina', sub: W.formatoIngresos === 'ventas' ? 'Total venta de cada cierre (incluye ICO y propina)' : 'Lo que se registró en los cierres de caja',
+        body: filasPunto('con') + row('Promedio por día', dias.length ? T.venta / dias.length : 0, 'sub'),
+        totalLbl: totLbl, total: T.venta, tone: 'pos' }) +
       card({ icon: 'imp', title: 'Impoconsumo y propina', sub: 'Se muestran aparte de la venta',
         body: row('Impoconsumo (ICO) registrado', T.ico) + (est ? row('ICO estimado de días sin registro (8%)', T.icoEst) : '') +
           (hayProp ? row('Propina', T.prop) : '\x3cdiv class="row">\x3cspan>Propina\x3c/span>\x3cspan class="chip neutro">No viene en el Excel\x3c/span>\x3c/div>'),
         totalLbl: 'Total impuesto y propina', total: icoT + T.prop, tone: 'neg' }) +
-      card({ icon: 'sum', title: 'Venta neta', sub: 'Sin impoconsumo ni propina', cls: 'big',
-        body: row('Venta total', T.venta) + row('Impoconsumo', -icoT) + row('Propina', -T.prop),
-        totalLbl: 'Venta neta', total: T.neta, tone: 'good' }) + '\x3c/section>';
+      card({ icon: 'sum', title: 'Venta sin impuestos y propina', sub: 'Venta total menos impoconsumo y propina', cls: 'big',
+        body: filasPunto('sin') + row('Venta con impuestos y propina', T.venta, 'sub') + row('(–) Impoconsumo', -icoT) + row('(–) Propina', -T.prop),
+        totalLbl: totLbl, total: T.neta, tone: 'good' }) + '\x3c/section>';
     // Avisos de cobertura
     var av = [];
     if (primerIco) { var sin = dias.filter(function (x) { return !x.d.icoReg; }).length; if (sin) av.push('El impoconsumo solo está registrado desde el ' + F(primerIco) + '. ' + sin + (sin === 1 ? ' día' : ' días') + ' del período no lo tienen' + (est ? ' y se estimaron al 8% incluido en la venta.' : '; active “Estimar ICO faltante” para calcularlo al 8%.')); }
